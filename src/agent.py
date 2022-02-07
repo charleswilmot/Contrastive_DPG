@@ -283,7 +283,18 @@ class Agent:
             mini = jnp.min(recomputed_returns[:, 0, t])
             maxi = jnp.max(recomputed_returns[:, 0, t])
             metadata = jnp.digitize(recomputed_returns[:, 0, t], jnp.linspace(mini, maxi, 5))
-            tensorboard.add_embedding(recomputed_actions[:, 0, t], metadata, tag=f'actions_t{t}', global_step=iteration)
+            label_img = jnp.ones(shape=(recomputed_returns.shape[0], 3, 10, 10), dtype=jnp.uint8)
+            X = recomputed_returns[:, 0, t].reshape((-1, 1)) # [N_ACTORS, 1]
+            X = (X - mini) / (maxi - mini)
+            colors = jnp.array([[255, 0, 0]]) * X + jnp.array([[0, 0, 255]]) * (1 - X) # [N_ACTORS, 3]
+            label_img *= jnp.expand_dims(colors, axis=(2, 3))
+            tensorboard.add_embedding(
+                recomputed_actions[:, 0, t],
+                metadata,
+                label_img=label_img,
+                tag=f'actions_t{t}',
+                global_step=iteration
+            )
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
