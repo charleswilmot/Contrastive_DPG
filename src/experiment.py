@@ -209,9 +209,11 @@ class Experiment:
             mean_critic_losses.append(infos["mean_critic_loss"])
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.plot(jnp.convolve(jnp.array(mean_critic_losses), hann(4), mode='valid'), color='b', alpha=0.10)
-        ax.plot(jnp.convolve(jnp.array(mean_critic_losses), hann(20), mode='valid'), color='b', alpha=0.30)
-        ax.plot(jnp.convolve(jnp.array(mean_critic_losses), hann(100), mode='valid'), color='b', alpha=1.00)
+        data = jnp.array(mean_critic_losses)
+        for size, alpha in [(4, 0.1), (20, 0.3), (100, 1.0)]:
+            X = jnp.arange(size // 2, n - size // 2 + 1)
+            Y = jnp.convolve(data, hann(size), mode='valid')
+            ax.plot(X, Y, color='b', alpha=alpha)
         fig.tight_layout()
         tensorboard.add_figure('training/mean_critic_loss(smoothed)', fig, iteration, close=True)
 
