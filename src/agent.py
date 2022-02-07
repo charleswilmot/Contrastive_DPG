@@ -279,14 +279,19 @@ class Agent:
         closest_10 = sorted_distances[1:11]
         tensorboard.add_scalar('noise/closest_5_mean_dist', jnp.mean(closest_5), iteration)
         tensorboard.add_scalar('noise/closest_10_mean_dist', jnp.mean(closest_10), iteration)
+        IM_SIZE = 5
         for t in (0, recomputed_actions.shape[2] // 2):
-            mini = jnp.min(recomputed_returns[:, 0, t])
-            maxi = jnp.max(recomputed_returns[:, 0, t])
-            metadata = jnp.digitize(recomputed_returns[:, 0, t], jnp.linspace(mini, maxi, 5))
-            label_img = jnp.ones(shape=(recomputed_returns.shape[0], 3, 10, 10), dtype=jnp.uint8)
-            X = recomputed_returns[:, 0, t].reshape((-1, 1)) # [N_ACTORS, 1]
+            return_data = recomputed_returns[:, 0, t]
+            mini = jnp.min(return_data)
+            maxi = jnp.max(return_data)
+            metadata = jnp.digitize(return_data, jnp.linspace(mini, maxi, 5))
+            label_img = jnp.ones(shape=(recomputed_returns.shape[0], 3, IM_SIZE, IM_SIZE), dtype=jnp.float32)
+            X = jnp.expand_dims(return_data, axis=-1) # [N_ACTORS, 1]
             X = (X - mini) / (maxi - mini)
-            colors = jnp.array([[255, 0, 0]]) * X + jnp.array([[0, 0, 255]]) * (1 - X) # [N_ACTORS, 3]
+            colors = (
+                jnp.array([[1, 0, 0]], dtype=jnp.float32) * X +
+                jnp.array([[0, 0, 1]], dtype=jnp.float32) * (1 - X)
+            ) # [N_ACTORS, 3]
             label_img *= jnp.expand_dims(colors, axis=(2, 3))
             tensorboard.add_embedding(
                 recomputed_actions[:, 0, t],
