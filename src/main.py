@@ -13,6 +13,7 @@ if __name__ == '__main__':
     discount_factor = 0.9
     noise_magnitude_limit = 0.5
     contrastive_loss_coef = 0.0001
+    smoothing_loss_coef = 0.01
     actor_learning_rate = 2e-5
     critic_learning_rate = 1e-3
     action_dim = 7
@@ -47,6 +48,7 @@ if __name__ == '__main__':
         discount_factor,
         noise_magnitude_limit,
         contrastive_loss_coef,
+        smoothing_loss_coef,
         actor_learning_rate,
         critic_learning_rate,
         action_dim,

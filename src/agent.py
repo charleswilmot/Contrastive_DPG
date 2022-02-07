@@ -14,12 +14,16 @@ matplotlib.use('TkAgg') # necessary to avoid conflict with Coppelia's Qt
 import matplotlib.pyplot as plt
 
 
+EPSILON = 1e-4
+
+
 class Agent:
     def __init__(self,
             n_actors,
             discount_factor,
             noise_magnitude_limit,
             contrastive_loss_coef,
+            smoothing_loss_coef,
             actor_learning_rate,
             critic_learning_rate,
             actions_dim):
@@ -35,6 +39,7 @@ class Agent:
         self._discount_factor = discount_factor # 0.96
         self._noise_magnitude_limit = noise_magnitude_limit # 0.2
         self._contrastive_loss_coef = contrastive_loss_coef # 0.1
+        self._smoothing_loss_coef = smoothing_loss_coef # 0.1
         self._actor_learning_rate = actor_learning_rate # 1e-3
         self._critic_learning_rate = critic_learning_rate # 1e-3
         self._actions_dim = actions_dim
@@ -52,9 +57,6 @@ class Agent:
         self._actor_optimizer = optax.adam(self._actor_learning_rate)
         self._critic_optimizer = optax.adam(self._critic_learning_rate)
         self._logger.info("initializing... done")
-        # values to keep track of:
-        # distribution of the 'n' in 'n-step' return (for different threshold values of lambda)
-        # average of the speed of the actions (ie. the balls) over the last 10 actor updates on a fixed set of states --> in order to determine how many actor training step are needed to find the maximum of a critic
 
     def init(self, dummy_states, dummy_actions, key):
         self._logger.info("constructing the parameters")
@@ -72,7 +74,7 @@ class Agent:
         )
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_action(self, actors_params, critic_params, states):
+    def get_action(self, actors_params, critic_params, states, actions_tm2=None, actions_tm1=None):
         ######### self._logger.debug(f'Inside get_action - {states.shape=}')
         actions = jnp.stack([
             self._policy_network.apply(actor_params, states) # shape [N_SIM, ACTION_DIM]
@@ -83,6 +85,15 @@ class Agent:
             self._critic_network.apply(critic_params, states, act)
             for act in actions
         ]) # shape [N_ACTORS, N_SIM]
+        if actions_tm1 is not None and actions_tm2 is not None:
+            returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
+                +1 * jnp.expand_dims(actions_tm2, axis=0) +
+                -2 * jnp.expand_dims(actions_tm1, axis=0) +
+                +1 * actions
+            ) ** 2, axis=-1))
+        else:
+            returns_actions_smoothing = jnp.zeros_like(returns)
+        returns -= self._smoothing_loss_coef * returns_actions_smoothing
         ######### self._logger.debug(f'Inside get_action - {returns.shape=}')
         where = jnp.argmax(returns, axis=0)[jnp.newaxis, ..., jnp.newaxis] # shape [1, N_SIM, 1]
         policy_actions = jnp.take_along_axis(actions, where, axis=0)[0] # shape [N_SIM, ACTION_DIM]
@@ -108,9 +119,21 @@ class Agent:
             self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
             for actor_params in actors_params
         ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
-        delta_actions_norm = jnp.sqrt((actions_after - actions_before) ** 2)
+        delta_actions_norm = jnp.sqrt(EPSILON + (actions_after - actions_before) ** 2)
         infos["max(|delta_actions|)"] = jnp.max(jnp.sum(delta_actions_norm, axis=-1))
         infos["mean(|delta_actions|)"] = jnp.mean(jnp.sum(delta_actions_norm, axis=-1))
+        d2actions_dt2_before = jnp.mean(jnp.sqrt(EPSILON + jnp.sum((
+            +1 * actions_before[:, :, 0:-2] +
+            -2 * actions_before[:, :, 1:-1] +
+            +1 * actions_before[:, :, 2:]
+        ) ** 2, axis=-1)))
+        d2actions_dt2_after = jnp.mean(jnp.sqrt(EPSILON + jnp.sum((
+            +1 * actions_after[:, :, 0:-2] +
+            -2 * actions_after[:, :, 1:-1] +
+            +1 * actions_after[:, :, 2:]
+        ) ** 2, axis=-1)))
+        infos["delta_mean(|d2actions_dt2|)"] = d2actions_dt2_after - d2actions_dt2_before
+        infos["mean(|d2actions_dt2|)"] = d2actions_dt2_after
         return actors_params, learner_state, infos
 
     @partial(jax.jit, static_argnums=(0,))
@@ -123,25 +146,30 @@ class Agent:
         return critic_params, learner_state, infos
 
     @partial(jax.jit, static_argnums=(0,))
-    def _actor_return_ascent_loss(self, actor_params, critic_params, states):
-        '''
-        states: dimension [BATCH, SEQUENCE, STATE_DIM]
-        '''
-        actions = self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
-        returns = self._critic_network.apply(critic_params, states, actions) # shape [BATCH, SEQUENCE]
-        return -jnp.mean(returns)
-
-    @partial(jax.jit, static_argnums=(0,))
-    def _actor_contrastive_loss(self, actors_params, states):
-        '''
-        states: dimension [BATCH, SEQUENCE, STATE_DIM]
-        '''
+    def _actor_loss(self, actors_params, critic_params, states):
         actions = jnp.stack([
             self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
             for actor_params in actors_params
         ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        returns = jnp.stack([
+            self._critic_network.apply(critic_params, states, act)
+            for act in actions
+        ]) # shape [N_ACTORS, BATCH, SEQUENCE]
+
+        ##### return ascent
+        loss = -jnp.sum(jnp.mean(returns, axis=(-1, -2)))
+
+        ##### actions smoothing
+        returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
+            +1 * actions[:, :, 0:-2] +
+            -2 * actions[:, :, 1:-1] +
+            +1 * actions[:, :, 2:]
+        ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
+        loss += self._smoothing_loss_coef * jnp.sum(jnp.mean(returns_actions_smoothing, axis=(-1, -2)))
+
+        ##### contrastive loss
         matrix = distance_matrix(euclidian_distance, actions)
-        return jnp.sum(potential_sink(matrix,
+        loss += self._contrastive_loss_coef * jnp.sum(potential_sink(matrix,
             n=5,
             r_ilambda=0.06,
             r_height=2,
@@ -149,17 +177,7 @@ class Agent:
             a_height=0.7,
             d_max=3,
         ))
-        # distances = self_distances(actions) # shape [N_ACTORS * (N_ACTORS - 1) / 2, BATCH, SEQUENCE]
-        # epsilon = 1e-2
-        # forces = 1. / (distances + epsilon)
-        # return jnp.mean(jnp.sum(forces, axis=0)) / self._n_actors
-
-    @partial(jax.jit, static_argnums=(0,))
-    def _actor_loss(self, actors_params, critic_params, states):
-        return sum(
-            self._actor_return_ascent_loss(actor_params, critic_params, states)
-            for actor_params in actors_params
-        ) + self._contrastive_loss_coef * self._actor_contrastive_loss(actors_params, states) # shape [BATCH, SEQUENCE]
+        return loss
 
     @partial(jax.jit, static_argnums=(0,))
     def _critic_loss(self, actors_params, critic_params, states, actions, rewards):
@@ -184,7 +202,7 @@ class Agent:
 
         # first: determine which actions are exploratory (ie. define the lambdas)
         reconstructed_noise = actions - policy_actions
-        reconstructed_noise_magnitude = jnp.sqrt(jnp.sum(reconstructed_noise ** 2, axis=-1)) # shape [BATCH, SEQUENCE]
+        reconstructed_noise_magnitude = jnp.sqrt(EPSILON + jnp.sum(reconstructed_noise ** 2, axis=-1)) # shape [BATCH, SEQUENCE]
         LN_2 = 0.693147
         lambdas = jnp.exp(-LN_2 * reconstructed_noise_magnitude / self._noise_magnitude_limit)
 
@@ -229,7 +247,7 @@ class Agent:
 
         # first: determine which actions are exploratory (ie. define the lambdas)
         reconstructed_noise = actions - policy_actions
-        reconstructed_noise_magnitude = jnp.sqrt(jnp.sum(reconstructed_noise ** 2, axis=-1)) # shape [BATCH, SEQUENCE]
+        reconstructed_noise_magnitude = jnp.sqrt(EPSILON + jnp.sum(reconstructed_noise ** 2, axis=-1)) # shape [BATCH, SEQUENCE]
         LN_2 = 0.693147
         lambdas = jnp.exp(-LN_2 * reconstructed_noise_magnitude / self._noise_magnitude_limit)
 
@@ -300,6 +318,13 @@ class Agent:
                 tag=f'actions_t{t}',
                 global_step=iteration
             )
+
+        actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
+            +1 * recomputed_actions[:, :, 0:-2] +
+            -2 * recomputed_actions[:, :, 1:-1] +
+            +1 * recomputed_actions[:, :, 2:]
+        ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
+        tensorboard.add_scalar('actions/mean_smoothing', jnp.mean(actions_smoothing), iteration)
 
         fig = plt.figure()
         ax = fig.add_subplot(111)

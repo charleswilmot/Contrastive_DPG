@@ -135,22 +135,28 @@ class Experiment:
         key, subkey = random.split(key)
         states, registers, goals = self.episode_reset(subkey)
         registers_tm1 = registers
+        actions_tm1 = None
+        actions_tm2 = None
         for iteration in range(self._episode_length):
             key, subkey = random.split(subkey)
+            actions_exp = self._agent.get_explorative_action(
+                self._actors_params,
+                self._critic_params,
+                jnp.concatenate([states, goals], axis=-1),
+                subkey,
+            )
+            actions = self._agent.get_action(
+                self._actors_params,
+                self._critic_params,
+                jnp.concatenate([states, goals], axis=-1),
+                actions_tm2=actions_tm2,
+                actions_tm1=actions_tm1,
+            )
             explore = random.bernoulli(subkey, p=exploration_prob)
             if explore:
-                actions = self._agent.get_explorative_action(
-                    self._actors_params,
-                    self._critic_params,
-                    jnp.concatenate([states, goals], axis=-1),
-                    subkey,
-                )
+                actions_apply = actions_exp
             else:
-                actions = self._agent.get_action(
-                    self._actors_params,
-                    self._critic_params,
-                    jnp.concatenate([states, goals], axis=-1),
-                )
+                actions_apply = actions
             self._data_buffer[:, iteration]["states"] = states
             self._data_buffer[:, iteration]["goals"] = goals
             self._data_buffer[:, iteration]["actions"] = actions
@@ -162,6 +168,8 @@ class Experiment:
             rewards = compute_reward(registers_tm1, registers, goals)
             self._data_buffer[:, iteration]["rewards"] = rewards
             registers_tm1 = registers
+            actions_tm2 = actions_tm1
+            actions_tm1 = actions_apply
         return self._data_buffer
 
     def collect_episode_data_multi(self, n_data_collect, exploration_prob, key):
@@ -223,6 +231,7 @@ class Experiment:
         mean_delta_actions_norm = []
         max_delta_actions_norm = []
         mean_actor_losses = []
+        mean_smoothings = []
         for i in range(n):
             self._logger.info(f'training  --  {i+1}/{n}')
             key, subkey = random.split(subkey)
@@ -240,6 +249,7 @@ class Experiment:
             mean_delta_actions_norm.append(infos["mean(|delta_actions|)"])
             max_delta_actions_norm.append(infos["max(|delta_actions|)"])
             mean_actor_losses.append(infos["mean_actor_loss"])
+            mean_smoothings.append(infos["mean(|d2actions_dt2|)"])
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -256,6 +266,11 @@ class Experiment:
         ax.plot(mean_actor_losses)
         fig.tight_layout()
         tensorboard.add_figure('training/mean_actor_loss', fig, iteration, close=True)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(mean_smoothings)
+        fig.tight_layout()
+        tensorboard.add_figure('training/mean_smoothing', fig, iteration, close=True)
 
     def log_data(self, tensorboard, data, iteration):
         self._agent.log_data(
@@ -288,31 +303,42 @@ class Experiment:
             self._logger.info(f'remaining episodes: {todo}/{n}')
             key, subkey = random.split(key)
             doing = min(self._n_sim, todo)
+            actions_tm1 = None
+            actions_tm2 = None
             with self._simulations.specific(list(range(doing))):
                 # collect episodes
                 states, registers, goals = self.episode_reset(subkey)
                 for it in range(self._episode_length):
                     key, subkey = random.split(key)
+
+                    actions_exp = self._agent.get_explorative_action(
+                        self._actors_params,
+                        self._critic_params,
+                        jnp.concatenate([states, goals], axis=-1),
+                        subkey,
+                    )
+                    actions = self._agent.get_action(
+                        self._actors_params,
+                        self._critic_params,
+                        jnp.concatenate([states, goals], axis=-1),
+                        actions_tm2=actions_tm2,
+                        actions_tm1=actions_tm1,
+                    )
                     explore = random.bernoulli(subkey, p=exploration_prob)
                     if explore:
-                        actions = self._agent.get_explorative_action(
-                            self._actors_params,
-                            self._critic_params,
-                            jnp.concatenate([states, goals], axis=-1),
-                            subkey,
-                        )
+                        actions_apply = actions_exp
                     else:
-                        actions = self._agent.get_action(
-                            self._actors_params,
-                            self._critic_params,
-                            jnp.concatenate([states, goals], axis=-1),
-                        )
+                        actions_apply = actions
+
                     with self._simulations.distribute_args():
-                        states_registers = self._simulations.apply_action(actions)
+                        states_registers = self._simulations.apply_action(actions_apply)
                     states = jnp.stack([s for s, r in states_registers])
                     with self._simulations.distribute_args():
                         frames = np.array(self._simulations.get_frame(cam_ids))
                     videos[todo - doing:todo, it] = frames
+
+                    actions_tm2 = actions_tm1
+                    actions_tm1 = actions_apply
             todo -= doing
         # delete cameras
         self._logger.debug('deleting cameras')
