@@ -164,22 +164,23 @@ class Agent:
         ##### return ascent
         loss = -jnp.sum(jnp.mean(returns, axis=(-1, -2)))
         ##### actions smoothing
-        returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
-            +1 * actions[:, :, 0:-2] +
-            -2 * actions[:, :, 1:-1] +
-            +1 * actions[:, :, 2:]
-        ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
-        loss += self._smoothing_loss_coef * jnp.sum(jnp.mean(returns_actions_smoothing, axis=(-1, -2)))
+        if self._smoothing_loss_coef != 0.0:
+            returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
+                +1 * actions[:, :, 0:-2] +
+                -2 * actions[:, :, 1:-1] +
+                +1 * actions[:, :, 2:]
+            ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
+            loss += self._smoothing_loss_coef * jnp.sum(jnp.mean(returns_actions_smoothing, axis=(-1, -2)))
         ##### contrastive loss
-        matrix = distance_matrix(euclidian_distance, actions)
-        loss += self._contrastive_loss_coef * jnp.sum(potential_sink(matrix,
-            n=5,
-            r_ilambda=0.06,
-            r_height=2,
-            a_ilambda=0.7,
-            a_height=0.7,
-            d_max=3,
-        ))
+        if self._contrastive_loss_coef != 0.0:
+            loss += self._contrastive_loss_coef * jnp.sum(potential_sink(actions,
+                n=5,
+                r_ilambda=0.06,
+                r_height=2,
+                a_ilambda=0.7,
+                a_height=0.7,
+                d_max=3,
+            ))
         return loss
 
     @partial(jax.jit, static_argnums=(0,))

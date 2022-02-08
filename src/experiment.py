@@ -162,7 +162,8 @@ class Experiment:
             self._data_buffer[:, iteration]["actions"] = actions
             with self._simulations.distribute_args():
                 ######### self._logger.debug(f'{explore=} {actions=}')
-                states_registers = self._simulations.apply_action(actions)
+                actions_tuple = tuple(a for a in actions_apply)
+                states_registers = self._simulations.apply_action(actions_tuple)
             states = jnp.stack([s for s, r in states_registers])
             registers = jnp.stack([r for s, r in states_registers])
             rewards = compute_reward(registers_tm1, registers, goals)
@@ -187,12 +188,12 @@ class Experiment:
         key1, key2, key3 = random.split(key, num=3)
         with self._simulations.distribute_args() as n_sim:
             # n_sim = len(self._simulations._active_producers_indices)
-            goals = random.bernoulli(key1, shape=(n_sim, self._registers_dim))
-            registers = random.bernoulli(key2, shape=(n_sim, self._registers_dim))
-            actions = random.uniform(key3, shape=(n_sim, self._actions_dim), minval=-1, maxval=1)
+            goals = tuple(random.bernoulli(key1, shape=(self._registers_dim,)) for _ in range(n_sim))
+            registers = tuple(random.bernoulli(key2, shape=(self._registers_dim,)) for _ in range(n_sim))
+            actions = tuple(random.uniform(key3, shape=(self._actions_dim,), minval=-1, maxval=1) for _ in range(n_sim))
             states_registers = self._simulations.reset(registers, goals, actions)
         states = jnp.stack([s for s, r in states_registers])
-        return states, registers.astype(jnp.int32), goals.astype(jnp.int32)
+        return states, jnp.array(registers).astype(jnp.int32), jnp.array(goals).astype(jnp.int32)
 
     def full_critic_training(self, tensorboard, data, n, key, iteration):
         self._logger.info(f'full critic training {data.shape=}')
@@ -331,7 +332,8 @@ class Experiment:
                         actions_apply = actions
 
                     with self._simulations.distribute_args():
-                        states_registers = self._simulations.apply_action(actions_apply)
+                        actions_tuple = tuple(a for a in actions_apply)
+                        states_registers = self._simulations.apply_action(actions_tuple)
                     states = jnp.stack([s for s, r in states_registers])
                     with self._simulations.distribute_args():
                         frames = np.array(self._simulations.get_frame(cam_ids))

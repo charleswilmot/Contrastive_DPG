@@ -6,6 +6,7 @@ import re
 import datetime
 from tensorboardX import SummaryWriter
 import numpy as np
+import jax
 
 
 if __name__ == '__main__':
@@ -38,6 +39,7 @@ if __name__ == '__main__':
     tensorboard_after_critic = SummaryWriter(logdir=f'{log_path}/{run_name}/after_critic', flush_secs=30)
     tensorboard_after_actor = SummaryWriter(logdir=f'{log_path}/{run_name}/after_actor', flush_secs=30)
     tensorboard_training = SummaryWriter(logdir=f'{log_path}/{run_name}/training', flush_secs=30)
+    profiling_path = f'{log_path}/{run_name}/profiling'
 
 
     subkey = random.PRNGKey(0)
@@ -61,15 +63,26 @@ if __name__ == '__main__':
         data_buffer[n_sim * n_data_collect:] = data
         for i in range(100):
             key, subkey = random.split(subkey)
+            if i == 1 and profile: jax.profiler.start_trace(profiling_path)
             data = experiment.collect_episode_data_multi(n_data_collect, exploration_prob, subkey)
+            if i == 1 and profile: jax.profiler.stop_trace()
+
             start = (i % lookback) * n_sim * n_data_collect
             stop = ((i % lookback) + 1) * n_sim * n_data_collect
             data_buffer[start:stop] = data
             experiment.log_data(tensorboard_before, data[:CUTOFF], i)
+
+            if i == 1 and profile: jax.profiler.start_trace(profiling_path)
             experiment.full_critic_training(tensorboard_training, data_buffer, 400, subkey, i)
+            if i == 1 and profile: jax.profiler.stop_trace()
+
             experiment.log_data(tensorboard_after_critic, data[:CUTOFF], i)
+
+            if i == 1 and profile: jax.profiler.start_trace(profiling_path)
             experiment.full_actor_training(tensorboard_training, data_buffer, 100, subkey, i)
+            if i == 1 and profile: jax.profiler.stop_trace()
+
             experiment.log_data(tensorboard_after_actor, data[:CUTOFF], i)
             experiment.checkpoint(f'../checkpoints/{run_name}.ckpt')
-            if not (i % 10):
+            if not (i % 10) and i != 0:
                 experiment.log_videos(tensorboard_after_actor, n_sim // 2, exploration_prob, original_key, i)
