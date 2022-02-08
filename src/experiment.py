@@ -131,7 +131,7 @@ class Experiment:
         return infos
 
     def collect_episode_data(self, exploration_prob, key):
-        ######### self._logger.info(f'collecting episode data {exploration_prob=}')
+        ######### self._logger.debug(f'collecting episode data {exploration_prob=}')
         key, subkey = random.split(key)
         states, registers, goals = self.episode_reset(subkey)
         registers_tm1 = registers
