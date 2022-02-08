@@ -15,13 +15,21 @@ def euclidian_distance(x1: jnp.ndarray, x2: jnp.ndarray) -> jnp.ndarray:
     return jnp.sqrt(1e-6 + jnp.sum((x1 - x2) ** 2, axis=-1))
 
 
-def distance_matrix(func: Callable, x: jnp.ndarray) -> jnp.ndarray:
+def distance_matrix_old(func: Callable, x: jnp.ndarray) -> jnp.ndarray:
     return jax.vmap(
         lambda x1: jax.vmap(
             lambda x2:
                 func(x1, x2)
         )(x)
     )(x) # shape [D0, D0, D1, ..., DN-1]
+
+
+def distance_matrix(func: Callable, x: jnp.ndarray) -> jnp.ndarray:
+    return func(x[jnp.newaxis], x[:, jnp.newaxis]) # shape [D0, D0, D1, ..., DN-1]
+
+
+def n_closest(func: Callable, x: jnp.ndarray, n: int) -> jnp.ndarray:
+    return jnp.sort(func(x[jnp.newaxis], x[:, jnp.newaxis]), axis=1)[:, 1:n+1] # shape [D0, n, D1, ..., DN-1]
 
 
 def self_distances(x: jnp.ndarray) -> jnp.ndarray:
