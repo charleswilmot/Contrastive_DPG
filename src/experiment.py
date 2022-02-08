@@ -52,8 +52,8 @@ class Experiment:
         dummy_states = jnp.concatenate([states, goals], axis=-1)
         dummy_actions = jnp.zeros(shape=(dummy_states.shape[0], self._actions_dim))
         (
-            self._actors_params,
-            self._actors_learner_state,
+            self._actor_params,
+            self._actor_learner_state,
             self._critic_params,
             self._critic_learner_state,
         ) = self._agent.init(dummy_states, dummy_actions, key)
@@ -80,39 +80,39 @@ class Experiment:
         self._logger.info(f'Creating new checkpoint under {path}')
         ckpt = {
             "critic": self._critic_params,
-            "actors": self._actors_params,
+            "actor": self._actor_params,
             "critic_learner_state": self._critic_learner_state,
-            "actors_learner_state": self._actors_learner_state,
+            "actor_learner_state": self._actor_learner_state,
         }
         with open(path, 'wb') as f:
             pickle.dump(ckpt, f)
 
     def restore(self, path,
             critic=True,
-            actors=True,
+            actor=True,
             critic_learner_state=None,
-            actors_learner_state=None):
+            actor_learner_state=None):
         self._logger.info(f'Restoring from checkpoint {path}')
         if critic and critic_learner_state is None:
             critic_learner_state = True
-        if actors and actors_learner_state is None:
-            actors_learner_state = True
+        if actor and actor_learner_state is None:
+            actor_learner_state = True
         with open(path, 'rb') as f:
             ckpt = pickle.load(f)
         if critic:
             self._critic_params = ckpt["critic"]
-        if actors:
-            self._actors_params = ckpt["actors"]
+        if actor:
+            self._actor_params = ckpt["actor"]
         if critic_learner_state:
             self._critic_learner_state = ckpt["critic_learner_state"]
-        if actors_learner_state:
-            self._actors_learner_state = ckpt["actors_learner_state"]
+        if actor_learner_state:
+            self._actor_learner_state = ckpt["actor_learner_state"]
 
     def train_actor(self, states, goals):
         ######### self._logger.info(f'training actor {states.shape=} {goals.shape=}')
-        self._actors_params, self._actors_learner_state, infos = self._agent.actor_learning_step(
-            self._actors_learner_state,
-            self._actors_params,
+        self._actor_params, self._actor_learner_state, infos = self._agent.actor_learning_step(
+            self._actor_learner_state,
+            self._actor_params,
             self._critic_params,
             jnp.concatenate([states, goals], axis=-1),
         )
@@ -122,7 +122,7 @@ class Experiment:
         ######### self._logger.info(f'training critic {states.shape=} {goals.shape=} {actions.shape=} {rewards.shape=}')
         self._critic_params, self._critic_learner_state, infos = self._agent.critic_learning_step(
             self._critic_learner_state,
-            self._actors_params,
+            self._actor_params,
             self._critic_params,
             jnp.concatenate([states, goals], axis=-1),
             actions,
@@ -140,13 +140,13 @@ class Experiment:
         for iteration in range(self._episode_length):
             key, subkey = random.split(subkey)
             actions_exp = self._agent.get_explorative_action(
-                self._actors_params,
+                self._actor_params,
                 self._critic_params,
                 jnp.concatenate([states, goals], axis=-1),
                 subkey,
             )
             actions = self._agent.get_action(
-                self._actors_params,
+                self._actor_params,
                 self._critic_params,
                 jnp.concatenate([states, goals], axis=-1),
                 actions_tm2=actions_tm2,
@@ -274,7 +274,7 @@ class Experiment:
 
     def log_data(self, tensorboard, data, iteration):
         self._agent.log_data(
-                    self._actors_params,
+                    self._actor_params,
                     self._critic_params,
                     jnp.concatenate([data["states"], data["goals"]], axis=-1),
                     data["actions"],
@@ -312,13 +312,13 @@ class Experiment:
                     key, subkey = random.split(key)
 
                     actions_exp = self._agent.get_explorative_action(
-                        self._actors_params,
+                        self._actor_params,
                         self._critic_params,
                         jnp.concatenate([states, goals], axis=-1),
                         subkey,
                     )
                     actions = self._agent.get_action(
-                        self._actors_params,
+                        self._actor_params,
                         self._critic_params,
                         jnp.concatenate([states, goals], axis=-1),
                         actions_tm2=actions_tm2,

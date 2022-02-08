@@ -43,48 +43,66 @@ class Agent:
         self._actor_learning_rate = actor_learning_rate # 1e-3
         self._critic_learning_rate = critic_learning_rate # 1e-3
         self._actions_dim = actions_dim
-        self._policy_network = hk.without_apply_rng(
-            hk.transform(lambda states: hk.Sequential([
-                nets.MLP([100, 100, self._actions_dim]),
-                jnp.tanh
-            ])(states))
-        )
-        self._critic_network = hk.without_apply_rng(
-            hk.transform(lambda states, actions:
-                nets.MLP([100, 100, 1])(jnp.concatenate([states, actions], axis=-1))[..., 0]
-            )
-        )
+
+        def actors(states):
+            raw_net_output = hk.Sequential([
+                nets.MLP([100, 100, self._actions_dim * self._n_actors]),
+                jnp.tanh,
+            ])(states)
+            shape = (*(s for s in raw_net_output.shape[:-1]), self._n_actors, self._actions_dim)
+            reshaped_net_output = jnp.reshape(
+                raw_net_output,
+                shape,
+            ) # shape [..., N_ACTORS, ACTION_DIM]
+            ndim = reshaped_net_output.ndim
+            first_axis = ndim - 2
+            axes = (first_axis, *(i for i in range(ndim) if i != first_axis))
+            actions = jnp.transpose(reshaped_net_output, axes=axes)
+            return actions
+
+        self._policy_network = hk.without_apply_rng(hk.transform(actors))
+
+        def critic(states, actions):
+            if actions.ndim == states.ndim + 1:
+                # action shape [N_ACTORS, ..., ACTION_DIM]
+                # state shape [..., STATE_DIM]
+                for state_s, action_s in zip(states.shape[:-1], actions.shape[1:-1]):
+                    if state_s != action_s:
+                        raise RuntimeError(f"states and actions are not broadcastable together... {states.shape=} {actions.shape=}")
+                shape = (*(s for s in actions.shape[:-1]), states.shape[-1])
+                states = jnp.broadcast_to(states[jnp.newaxis], shape)
+            elif actions.ndim == states.ndim:
+                pass
+            else:
+                raise RuntimeError(f"States and actions have incompatible dimensions: {states.ndim=} {actions.ndim=}")
+            inp = jnp.concatenate([states, actions], axis=-1)
+            return nets.MLP([100, 100, 1])(inp)[..., 0] # remove the last dim
+
+        self._critic_network = hk.without_apply_rng(hk.transform(critic))
+
         self._actor_optimizer = optax.adam(self._actor_learning_rate)
         self._critic_optimizer = optax.adam(self._critic_learning_rate)
         self._logger.info("initializing... done")
 
     def init(self, dummy_states, dummy_actions, key):
+        key, subkey = random.split(key)
         self._logger.info("constructing the parameters")
-        self._actors_params_init = [
-            self._policy_network.init(subkey, dummy_states)
-            for subkey in random.split(key, self._n_actors)
-        ]
+        self._actor_params_init = self._policy_network.init(subkey, dummy_states)
         key, subkey = random.split(key)
         self._critic_params_init = self._critic_network.init(subkey, dummy_states, dummy_actions)
         return (
-            self._actors_params_init,
-            self._actor_optimizer.init(self._actors_params_init),
+            self._actor_params_init,
+            self._actor_optimizer.init(self._actor_params_init),
             self._critic_params_init,
             self._critic_optimizer.init(self._critic_params_init),
         )
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_action(self, actors_params, critic_params, states, actions_tm2=None, actions_tm1=None):
+    def get_action(self, actor_params, critic_params, states, actions_tm2=None, actions_tm1=None):
         ######### self._logger.debug(f'Inside get_action - {states.shape=}')
-        actions = jnp.stack([
-            self._policy_network.apply(actor_params, states) # shape [N_SIM, ACTION_DIM]
-            for actor_params in actors_params
-        ]) # shape [N_ACTORS, N_SIM, ACTION_DIM]
+        actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, N_SIM, ACTION_DIM]
         ######### self._logger.debug(f'Inside get_action - {actions.shape=}')
-        returns = jnp.stack([
-            self._critic_network.apply(critic_params, states, act)
-            for act in actions
-        ]) # shape [N_ACTORS, N_SIM]
+        returns = self._critic_network.apply(critic_params, states, actions) # shape [N_ACTORS, N_SIM]
         if actions_tm1 is not None and actions_tm2 is not None:
             returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
                 +1 * jnp.expand_dims(actions_tm2, axis=0) +
@@ -100,25 +118,19 @@ class Agent:
         ######### self._logger.debug(f'Inside get_action - {policy_actions.shape=}')
         return policy_actions
 
-    def get_explorative_action(self, actors_params, critic_params, states, key):
+    def get_explorative_action(self, actor_params, critic_params, states, key):
         index = random.randint(key, shape=(), minval=0, maxval=self._n_actors)
-        return self._policy_network.apply(actors_params[index], states)
+        return self._policy_network.apply(actor_params, states)[index] # shape [N_SIM, ACTION_DIM]
 
     @partial(jax.jit, static_argnums=(0,))
-    def actor_learning_step(self, learner_state, actors_params, critic_params, states):
+    def actor_learning_step(self, learner_state, actor_params, critic_params, states):
         infos = {}
-        actions_before = jnp.stack([
-            self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
-            for actor_params in actors_params
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
-        actor_loss_value, dloss_dtheta = jax.value_and_grad(self._actor_loss)(actors_params, critic_params, states)
+        actions_before = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        actor_loss_value, dloss_dtheta = jax.value_and_grad(self._actor_loss)(actor_params, critic_params, states)
         infos["mean_actor_loss"] = jnp.mean(actor_loss_value)
         updates, learner_state = self._actor_optimizer.update(dloss_dtheta, learner_state)
-        actors_params = optax.apply_updates(actors_params, updates)
-        actions_after = jnp.stack([
-            self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
-            for actor_params in actors_params
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        actor_params = optax.apply_updates(actor_params, updates)
+        actions_after = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
         delta_actions_norm = jnp.sqrt(EPSILON + (actions_after - actions_before) ** 2)
         infos["max(|delta_actions|)"] = jnp.max(jnp.sum(delta_actions_norm, axis=-1))
         infos["mean(|delta_actions|)"] = jnp.mean(jnp.sum(delta_actions_norm, axis=-1))
@@ -134,31 +146,23 @@ class Agent:
         ) ** 2, axis=-1)))
         infos["delta_mean(|d2actions_dt2|)"] = d2actions_dt2_after - d2actions_dt2_before
         infos["mean(|d2actions_dt2|)"] = d2actions_dt2_after
-        return actors_params, learner_state, infos
+        return actor_params, learner_state, infos
 
     @partial(jax.jit, static_argnums=(0,))
-    def critic_learning_step(self, learner_state, actors_params, critic_params, states, actions, rewards):
+    def critic_learning_step(self, learner_state, actor_params, critic_params, states, actions, rewards):
         infos = {}
-        critic_loss_value, dloss_dtheta = jax.value_and_grad(self._critic_loss, argnums=1)(actors_params, critic_params, states, actions, rewards)
+        critic_loss_value, dloss_dtheta = jax.value_and_grad(self._critic_loss, argnums=1)(actor_params, critic_params, states, actions, rewards)
         infos["mean_critic_loss"] = jnp.mean(critic_loss_value)
         updates, learner_state = self._critic_optimizer.update(dloss_dtheta, learner_state)
         critic_params = optax.apply_updates(critic_params, updates)
         return critic_params, learner_state, infos
 
     @partial(jax.jit, static_argnums=(0,))
-    def _actor_loss(self, actors_params, critic_params, states):
-        actions = jnp.stack([
-            self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
-            for actor_params in actors_params
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
-        returns = jnp.stack([
-            self._critic_network.apply(critic_params, states, act)
-            for act in actions
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE]
-
+    def _actor_loss(self, actor_params, critic_params, states):
+        actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        returns = self._critic_network.apply(critic_params, states, actions)
         ##### return ascent
         loss = -jnp.sum(jnp.mean(returns, axis=(-1, -2)))
-
         ##### actions smoothing
         returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
             +1 * actions[:, :, 0:-2] +
@@ -166,7 +170,6 @@ class Agent:
             +1 * actions[:, :, 2:]
         ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
         loss += self._smoothing_loss_coef * jnp.sum(jnp.mean(returns_actions_smoothing, axis=(-1, -2)))
-
         ##### contrastive loss
         matrix = distance_matrix(euclidian_distance, actions)
         loss += self._contrastive_loss_coef * jnp.sum(potential_sink(matrix,
@@ -180,21 +183,15 @@ class Agent:
         return loss
 
     @partial(jax.jit, static_argnums=(0,))
-    def _critic_loss(self, actors_params, critic_params, states, actions, rewards):
+    def _critic_loss(self, actor_params, critic_params, states, actions, rewards):
         '''
         states: dimension [BATCH, SEQUENCE, STATE_DIM]
         actions: dimension [BATCH, SEQUENCE, ACTION_DIM]
         rewards: dimension [BATCH, SEQUENCE]
         '''
-        recomputed_actions = jnp.stack([
-            self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
-            for actor_params in actors_params
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        recomputed_actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
         returns = self._critic_network.apply(critic_params, states, actions) # shape [BATCH, SEQUENCE]
-        recomputed_returns = jnp.stack([
-            self._critic_network.apply(critic_params, states, recomputed_act)
-            for recomputed_act in recomputed_actions
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE]
+        recomputed_returns = self._critic_network.apply(critic_params, states, recomputed_actions) # shape [N_ACTORS, BATCH, SEQUENCE]
         where = jnp.argmax(recomputed_returns, axis=0)[jnp.newaxis, ..., jnp.newaxis] # shape [BATCH, SEQUENCE]
         best_recomputed_returns = jnp.take_along_axis(recomputed_returns, where[..., 0], axis=0)[0] # shape [BATCH, SEQUENCE]
         policy_actions = jnp.take_along_axis(recomputed_actions, where, axis=0)[0] # shape [BATCH, SEQUENCE, ACTION_DIM]
@@ -225,21 +222,15 @@ class Agent:
         return loss # shape [BATCH, SEQUENCE]
 
     # @partial(jax.jit, static_argnums=(0, 6))
-    def log_data(self, actors_params, critic_params, states, actions, rewards, tensorboard, iteration):
+    def log_data(self, actor_params, critic_params, states, actions, rewards, tensorboard, iteration):
         '''
         states: dimension [BATCH, SEQUENCE, STATE_DIM]
         actions: dimension [BATCH, SEQUENCE, ACTION_DIM]
         rewards: dimension [BATCH, SEQUENCE]
         '''
-        recomputed_actions = jnp.stack([
-            self._policy_network.apply(actor_params, states) # shape [BATCH, SEQUENCE, ACTION_DIM]
-            for actor_params in actors_params
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        recomputed_actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
         returns = self._critic_network.apply(critic_params, states, actions) # shape [BATCH, SEQUENCE]
-        recomputed_returns = jnp.stack([
-            self._critic_network.apply(critic_params, states, recomputed_act)
-            for recomputed_act in recomputed_actions
-        ]) # shape [N_ACTORS, BATCH, SEQUENCE]
+        recomputed_returns = self._critic_network.apply(critic_params, states, recomputed_actions) # shape [N_ACTORS, BATCH, SEQUENCE]
         where = jnp.argmax(recomputed_returns, axis=0)[jnp.newaxis, ..., jnp.newaxis] # shape [BATCH, SEQUENCE]
         best_recomputed_returns = jnp.take_along_axis(recomputed_returns, where[..., 0], axis=0)[0] # shape [BATCH, SEQUENCE]
         policy_actions = jnp.take_along_axis(recomputed_actions, where, axis=0)[0] # shape [BATCH, SEQUENCE, ACTION_DIM]
