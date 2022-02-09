@@ -187,10 +187,9 @@ class Experiment:
     def episode_reset(self, key):
         key1, key2, key3 = random.split(key, num=3)
         with self._simulations.distribute_args() as n_sim:
-            # n_sim = len(self._simulations._active_producers_indices)
-            goals = tuple(random.bernoulli(key1, shape=(self._registers_dim,)) for _ in range(n_sim))
-            registers = tuple(random.bernoulli(key2, shape=(self._registers_dim,)) for _ in range(n_sim))
-            actions = tuple(random.uniform(key3, shape=(self._actions_dim,), minval=-1, maxval=1) for _ in range(n_sim))
+            goals = tuple(random.bernoulli(subkey, shape=(self._registers_dim,)) for subkey in random.split(key1, num=n_sim))
+            registers = tuple(random.bernoulli(subkey, shape=(self._registers_dim,)) for subkey in random.split(key2, num=n_sim))
+            actions = tuple(random.uniform(subkey, shape=(self._actions_dim,), minval=-1, maxval=1) for subkey in random.split(key3, num=n_sim))
             states_registers = self._simulations.reset(registers, goals, actions)
         states = jnp.stack([s for s, r in states_registers])
         return states, jnp.array(registers).astype(jnp.int32), jnp.array(goals).astype(jnp.int32)
