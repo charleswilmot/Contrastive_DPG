@@ -220,6 +220,15 @@ class Agent:
         recomputed_actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
         returns = self._critic_network.apply(critic_params, states, actions) # shape [BATCH, SEQUENCE]
         recomputed_returns = self._critic_network.apply(critic_params, states, recomputed_actions) # shape [N_ACTORS, BATCH, SEQUENCE]
+        # # bunchify to avoid excessive memory consumption
+        # slices = (
+        #     slice(i, i + BUNCH_SIZE)
+        #     for i in range(0, recomputed_actions.shape[0], BUNCH_SIZE)
+        # )
+        # recomputed_returns = jnp.concatenate([
+        #     self._critic_network.apply(critic_params, states, recomputed_actions_bunch) # shape [BUNCH_SIZE, BATCH, SEQUENCE]
+        #     for recomputed_actions_bunch in recomputed_actions[slices]
+        # ], axis=0)
         where = jnp.argmax(recomputed_returns, axis=0)[jnp.newaxis, ..., jnp.newaxis] # shape [BATCH, SEQUENCE]
         best_recomputed_returns = jnp.take_along_axis(recomputed_returns, where[..., 0], axis=0)[0] # shape [BATCH, SEQUENCE]
         policy_actions = jnp.take_along_axis(recomputed_actions, where, axis=0)[0] # shape [BATCH, SEQUENCE, ACTION_DIM]
@@ -248,6 +257,7 @@ class Agent:
 
         # third: compute the l2 loss / hubber loss
         critic_loss = jnp.mean(rlax.l2_loss(returns[..., :-1], target_returns))
+        td = target_returns - returns[..., :-1]
 
         batched = jax.vmap(
             lambda rewards, discounts, best_recomputed_returns:
@@ -324,8 +334,8 @@ class Agent:
         tensorboard.add_scalar('perf/estimated_return_mean', jnp.mean(best_recomputed_returns), iteration)
         tensorboard.add_scalar('perf/critic_loss', critic_loss, iteration)
         tensorboard.add_scalar('perf/no_noise_critic_loss', no_noise_critic_loss, iteration)
-        tensorboard.add_scalar('perf/mean_abs_td', jnp.mean(jnp.abs(target_returns - returns[..., :-1])), iteration)
-        tensorboard.add_histogram('perf/td', target_returns - returns[..., :-1], iteration)
+        tensorboard.add_scalar('perf/mean_abs_td', jnp.mean(jnp.abs(td)), iteration)
+        tensorboard.add_histogram('perf/td', td, iteration)
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -334,7 +344,7 @@ class Agent:
             x = jnp.nonzero(rewrd)
             y = rewrd[x] + i * 1.2
             ax.scatter(x, y, color='k', alpha=0.5)
-        ax.plot(jnp.array([0, 10]), jnp.stack([jnp.arange(N_LINES)] * 2) * 1.2)
+        ax.plot(jnp.array([0, 10]), jnp.stack([jnp.arange(N_LINES)] * 2) * 1.2, color='k')
         ax.plot(jnp.arange(N_LINES)[jnp.newaxis] * 1.2 + returns[:N_LINES, ..., :-1].T, color='b')
         ax.plot(jnp.arange(N_LINES)[jnp.newaxis] * 1.2 + target_returns[:N_LINES].T, color='r')
         ax.set_axis_off()

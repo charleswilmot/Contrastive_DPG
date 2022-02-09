@@ -17,12 +17,13 @@ if __name__ == '__main__':
     actor_learning_rate = 2e-5
     critic_learning_rate = 1e-3
     action_dim = 7
-    n_sim = 16
+    n_sim = 20
     batch_size = 4
     exploration_prob = 0.4
     episode_length = 100
     lookback = 4
     smoothing = 0.2
+    profile = True
 
     n_data_points = episode_length * n_sim * 8
     n_data_collect = n_data_points // (episode_length * n_sim)
