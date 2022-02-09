@@ -23,7 +23,6 @@ class Agent:
             discount_factor,
             noise_magnitude_limit,
             contrastive_loss_coef,
-            smoothing_loss_coef,
             actor_learning_rate,
             critic_learning_rate,
             actions_dim):
@@ -39,7 +38,6 @@ class Agent:
         self._discount_factor = discount_factor # 0.96
         self._noise_magnitude_limit = noise_magnitude_limit # 0.2
         self._contrastive_loss_coef = contrastive_loss_coef # 0.1
-        self._smoothing_loss_coef = smoothing_loss_coef # 0.1
         self._actor_learning_rate = actor_learning_rate # 1e-3
         self._critic_learning_rate = critic_learning_rate # 1e-3
         self._actions_dim = actions_dim
@@ -97,8 +95,8 @@ class Agent:
             self._critic_optimizer.init(self._critic_params_init),
         )
 
-    @partial(jax.jit, static_argnums=(0,))
-    def get_action(self, actor_params, critic_params, states, actions_tm2=None, actions_tm1=None):
+    @partial(jax.jit, static_argnums=(0, 6))
+    def get_action(self, actor_params, critic_params, states, actions_tm2=None, actions_tm1=None, smoothing=0.0):
         ######### self._logger.debug(f'Inside get_action - {states.shape=}')
         actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, N_SIM, ACTION_DIM]
         ######### self._logger.debug(f'Inside get_action - {actions.shape=}')
@@ -109,9 +107,7 @@ class Agent:
                 -2 * jnp.expand_dims(actions_tm1, axis=0) +
                 +1 * actions
             ) ** 2, axis=-1))
-        else:
-            returns_actions_smoothing = jnp.zeros_like(returns)
-        returns -= self._smoothing_loss_coef * returns_actions_smoothing
+            returns -= smoothing * returns_actions_smoothing
         ######### self._logger.debug(f'Inside get_action - {returns.shape=}')
         where = jnp.argmax(returns, axis=0)[jnp.newaxis, ..., jnp.newaxis] # shape [1, N_SIM, 1]
         policy_actions = jnp.take_along_axis(actions, where, axis=0)[0] # shape [N_SIM, ACTION_DIM]
@@ -163,14 +159,6 @@ class Agent:
         returns = self._critic_network.apply(critic_params, states, actions)
         ##### return ascent
         loss = -jnp.sum(jnp.mean(returns, axis=(-1, -2)))
-        ##### actions smoothing
-        if self._smoothing_loss_coef != 0.0:
-            returns_actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
-                +1 * actions[:, :, 0:-2] +
-                -2 * actions[:, :, 1:-1] +
-                +1 * actions[:, :, 2:]
-            ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
-            loss += self._smoothing_loss_coef * jnp.sum(jnp.mean(returns_actions_smoothing, axis=(-1, -2)))
         ##### contrastive loss
         if self._contrastive_loss_coef != 0.0:
             loss += self._contrastive_loss_coef * jnp.sum(potential_sink(actions,
@@ -217,8 +205,8 @@ class Agent:
                 )
         )
         target_returns = batched(rewards, discounts, best_recomputed_returns, lambdas)
-
         loss = jnp.mean(rlax.l2_loss(returns[..., :-1], target_returns))
+
         # third: return the l2 loss / hubber loss
         return loss # shape [BATCH, SEQUENCE]
 
@@ -310,13 +298,6 @@ class Agent:
                 tag=f'actions_t{t}',
                 global_step=iteration
             )
-
-        actions_smoothing = jnp.sqrt(EPSILON + jnp.sum((
-            +1 * recomputed_actions[:, :, 0:-2] +
-            -2 * recomputed_actions[:, :, 1:-1] +
-            +1 * recomputed_actions[:, :, 2:]
-        ) ** 2, axis=-1)) # [N_ACTORS, BATCH, SEQUENCE - 2]
-        tensorboard.add_scalar('actions/mean_smoothing', jnp.mean(actions_smoothing), iteration)
 
         fig = plt.figure()
         ax = fig.add_subplot(111)

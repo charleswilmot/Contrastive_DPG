@@ -135,42 +135,36 @@ class Experiment:
         key, subkey = random.split(key)
         states, registers, goals = self.episode_reset(subkey)
         registers_tm1 = registers
-        actions_tm1 = None
-        actions_tm2 = None
         for iteration in range(self._episode_length):
             key, subkey = random.split(subkey)
-            actions_exp = self._agent.get_explorative_action(
-                self._actor_params,
-                self._critic_params,
-                jnp.concatenate([states, goals], axis=-1),
-                subkey,
-            )
-            actions = self._agent.get_action(
-                self._actor_params,
-                self._critic_params,
-                jnp.concatenate([states, goals], axis=-1),
-                actions_tm2=actions_tm2,
-                actions_tm1=actions_tm1,
-            )
+
             explore = random.bernoulli(subkey, p=exploration_prob)
             if explore:
-                actions_apply = actions_exp
+                actions = self._agent.get_explorative_action(
+                    self._actor_params,
+                    self._critic_params,
+                    jnp.concatenate([states, goals], axis=-1),
+                    subkey,
+                )
             else:
-                actions_apply = actions
+                actions = self._agent.get_action(
+                    self._actor_params,
+                    self._critic_params,
+                    jnp.concatenate([states, goals], axis=-1),
+                )
+
             self._data_buffer[:, iteration]["states"] = states
             self._data_buffer[:, iteration]["goals"] = goals
             self._data_buffer[:, iteration]["actions"] = actions
             with self._simulations.distribute_args():
                 ######### self._logger.debug(f'{explore=} {actions=}')
-                actions_tuple = tuple(a for a in actions_apply)
+                actions_tuple = tuple(a for a in actions)
                 states_registers = self._simulations.apply_action(actions_tuple)
             states = jnp.stack([s for s, r in states_registers])
             registers = jnp.stack([r for s, r in states_registers])
             rewards = compute_reward(registers_tm1, registers, goals)
             self._data_buffer[:, iteration]["rewards"] = rewards
             registers_tm1 = registers
-            actions_tm2 = actions_tm1
-            actions_tm1 = actions_apply
         return self._data_buffer
 
     def collect_episode_data_multi(self, n_data_collect, exploration_prob, key):
@@ -283,7 +277,9 @@ class Experiment:
                     iteration,
         )
 
-    def get_videos(self, n, exploration_prob, key, width=200, height=200):
+    def get_videos(self, n, exploration_prob, key, smoothing=0.0, width=200, height=200):
+        if exploration_prob != 0.0 and smoothing != 0.0:
+            raise RuntimeError("Only one of exploration_prob or smoothing can be non zero.")
         self._logger.info(f'Creating a video {n=} {exploration_prob=} {width=} {height=}')
         # add cameras
         self._logger.debug('adding cameras')
@@ -309,29 +305,28 @@ class Experiment:
                 # collect episodes
                 states, registers, goals = self.episode_reset(subkey)
                 for it in range(self._episode_length):
-                    key, subkey = random.split(key)
+                    key, subkey = random.split(subkey)
 
-                    actions_exp = self._agent.get_explorative_action(
+                    explore = random.bernoulli(subkey, p=exploration_prob)
+                    if explore:
+                        actions = self._agent.get_explorative_action(
                         self._actor_params,
                         self._critic_params,
                         jnp.concatenate([states, goals], axis=-1),
                         subkey,
-                    )
-                    actions = self._agent.get_action(
-                        self._actor_params,
-                        self._critic_params,
-                        jnp.concatenate([states, goals], axis=-1),
-                        actions_tm2=actions_tm2,
-                        actions_tm1=actions_tm1,
-                    )
-                    explore = random.bernoulli(subkey, p=exploration_prob)
-                    if explore:
-                        actions_apply = actions_exp
+                        )
                     else:
-                        actions_apply = actions
+                        actions = self._agent.get_action(
+                            self._actor_params,
+                            self._critic_params,
+                            jnp.concatenate([states, goals], axis=-1),
+                            actions_tm2=actions_tm2,
+                            actions_tm1=actions_tm1,
+                            smoothing=smoothing,
+                        )
 
                     with self._simulations.distribute_args():
-                        actions_tuple = tuple(a for a in actions_apply)
+                        actions_tuple = tuple(a for a in actions)
                         states_registers = self._simulations.apply_action(actions_tuple)
                     states = jnp.stack([s for s, r in states_registers])
                     with self._simulations.distribute_args():
@@ -339,7 +334,7 @@ class Experiment:
                     videos[todo - doing:todo, it] = frames
 
                     actions_tm2 = actions_tm1
-                    actions_tm1 = actions_apply
+                    actions_tm1 = actions
             todo -= doing
         # delete cameras
         self._logger.debug('deleting cameras')
@@ -347,8 +342,10 @@ class Experiment:
             self._simulations.delete_camera(cam_ids)
         return videos
 
-    def log_videos(self, tensorboard, n, exploration_prob, key, iteration, width=200, height=200):
-        videos = self.get_videos(n, exploration_prob, key, width=width, height=height)
-        tensorboard.add_video('videos/explorative', videos, iteration, fps=25, dataformats='NTHWC')
-        videos = self.get_videos(n, 0.0, key, width=width, height=height)
+    def log_videos(self, tensorboard, n, exploration_prob, smoothing, key, iteration, width=200, height=200):
+        videos = self.get_videos(n, 0.0, key, smoothing=smoothing, width=width, height=height)
+        tensorboard.add_video('videos/non_explorative_smooth', videos, iteration, fps=25, dataformats='NTHWC')
+        videos = self.get_videos(n, 0.0, key, smoothing=0.0, width=width, height=height)
         tensorboard.add_video('videos/non_explorative', videos, iteration, fps=25, dataformats='NTHWC')
+        videos = self.get_videos(n, exploration_prob, key, smoothing=0.0, width=width, height=height)
+        tensorboard.add_video('videos/explorative', videos, iteration, fps=25, dataformats='NTHWC')
