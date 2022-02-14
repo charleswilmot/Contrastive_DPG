@@ -201,15 +201,13 @@ class SimulationConsumer(SimulationConsumerAbstract):
         ]
 
     @communicate_return_value
-    def reset(self, register_states, register_goals, actions=None):
+    def reset(self, register_states, register_goals, actions):
         self._previous_hermite_speeds[:] = 0
         self._previous_hermite_accelerations[:] = 0
         for tree in self._reset_configuration_trees:
             self._pyrep.set_configuration_tree(tree)
         self.set_stateful_objects_states(register_states)
         self.set_stateful_objects_goals(register_goals)
-        if actions is None:
-            actions = np.random.uniform(size=self._n_joints, low=-1, high=1)
         velocities = actions * self._upper_velocity_limits
         self.set_joint_target_velocities(velocities)
         self.step_sim() # three steps with a random velocity for randomization

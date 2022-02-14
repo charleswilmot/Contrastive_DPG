@@ -1,4 +1,7 @@
+import matplotlib
+matplotlib.use('Agg') # necessary to avoid conflict with Coppelia's Qt
 from experiment import Experiment
+from exploration import ExplorationConfig
 from agent import Agent
 from jax import random
 import os
@@ -10,24 +13,57 @@ import jax
 
 
 if __name__ == '__main__':
-    n_actors = 50
+    # https://en.wikipedia.org/wiki/Kissing_number
+
     discount_factor = 0.9
     noise_magnitude_limit = 0.5
-    contrastive_loss_coef = 0.0001
-    actor_learning_rate = 2e-5
+    hierarchization_coef = 1.0 # has been increased from 0.01 to 0.1, then from 0.01 to 1.0
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 2
+    minmax_factor = 1.5
+    dmin2 = 0.6
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+    hierarchization_config = (
+        (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    # level=0 - dim=60 - d_min=2.54 - d_max=3.81 - slope_min=0.86 - slope_max=0.86
+    # level=1 - dim=3 - d_min=0.6 - d_max=0.90 - slope_min=0.75 - slope_max=0.75
+
+    actor_learning_rate = 2e-5 # used to be 2e-5
     critic_learning_rate = 1e-3
     action_dim = 7
     n_sim = 20
     batch_size = 4
-    exploration_prob = 0.4
+    exploration_config = ExplorationConfig(
+        type="softmax_temperature",
+        N=4000,
+        interpolation_type='cosine',
+        upsilon_t0=0.2,
+        upsilon_tN=0.6,
+        exploration_prob_t0=0.9,
+        exploration_prob_tN=0.1,
+        softmax_temperature_t0=1.0,
+        softmax_temperature_tN=0.25,
+    )
     episode_length = 100
     lookback = 4
-    smoothing = 0.2
-    profile = True
+    smoothing = 0.0  # 0.04
+    PRNGKey_start = 0
+    n_episodes_per_loop_iteration = 160
+    experiment_length_in_ep = 16000
+    n_critic_training_per_loop_iteration = 400
+    n_actor_training_per_loop_iteration = 100
+    tensorboard_log = True
+    restore_path = None
 
-    n_data_points = episode_length * n_sim * 8
-    n_data_collect = n_data_points // (episode_length * n_sim)
-    CUTOFF = min(n_data_collect * n_sim, 100)
 
     log_path = '../experiments'
     ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
@@ -36,53 +72,28 @@ if __name__ == '__main__':
     else:
         exp_id = 0
     run_name = f'{exp_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
-    tensorboard_before = SummaryWriter(logdir=f'{log_path}/{run_name}/before', flush_secs=30)
-    tensorboard_after_critic = SummaryWriter(logdir=f'{log_path}/{run_name}/after_critic', flush_secs=30)
-    tensorboard_after_actor = SummaryWriter(logdir=f'{log_path}/{run_name}/after_actor', flush_secs=30)
-    tensorboard_training = SummaryWriter(logdir=f'{log_path}/{run_name}/training', flush_secs=30)
-    profiling_path = f'{log_path}/{run_name}/profiling'
-
-
-    subkey = random.PRNGKey(0)
-    original_key = subkey
 
     agent = Agent(
-        n_actors,
         discount_factor,
         noise_magnitude_limit,
-        contrastive_loss_coef,
+        hierarchization_config,
+        hierarchization_coef,
         actor_learning_rate,
         critic_learning_rate,
         action_dim,
     )
-    args = [n_sim, batch_size, exploration_prob, episode_length, agent]
+
+    args = [n_sim, batch_size, smoothing, episode_length, agent]
     with Experiment(*args) as experiment:
-        # experiment.restore('../checkpoints/init_weights.ckpt')
-        data_buffer = np.zeros(shape=(n_sim * n_data_collect * lookback, episode_length), dtype=experiment._dtype)
-        data = experiment.collect_episode_data_multi(n_data_collect * (lookback - 1), exploration_prob, subkey)
-        data_buffer[n_sim * n_data_collect:] = data
-        for i in range(100):
-            key, subkey = random.split(subkey)
-            if i == 1 and profile: jax.profiler.start_trace(profiling_path)
-            data = experiment.collect_episode_data_multi(n_data_collect, exploration_prob, subkey)
-            if i == 1 and profile: jax.profiler.stop_trace()
-
-            start = (i % lookback) * n_sim * n_data_collect
-            stop = ((i % lookback) + 1) * n_sim * n_data_collect
-            data_buffer[start:stop] = data
-            experiment.log_data(tensorboard_before, data[:CUTOFF], i)
-
-            if i == 1 and profile: jax.profiler.start_trace(profiling_path)
-            experiment.full_critic_training(tensorboard_training, data_buffer, 400, subkey, i)
-            if i == 1 and profile: jax.profiler.stop_trace()
-
-            experiment.log_data(tensorboard_after_critic, data[:CUTOFF], i)
-
-            if i == 1 and profile: jax.profiler.start_trace(profiling_path)
-            experiment.full_actor_training(tensorboard_training, data_buffer, 100, subkey, i)
-            if i == 1 and profile: jax.profiler.stop_trace()
-
-            experiment.log_data(tensorboard_after_actor, data[:CUTOFF], i)
-            experiment.checkpoint(f'../checkpoints/{run_name}.ckpt')
-            if not (i % 10) and i != 0:
-                experiment.log_videos(tensorboard_after_actor, 8, exploration_prob, smoothing, original_key, i)
+        experiment.mainloop(
+            PRNGKey_start=PRNGKey_start,
+            lookback=lookback,
+            n_episodes_per_loop_iteration=n_episodes_per_loop_iteration,
+            experiment_length_in_ep=experiment_length_in_ep,
+            n_critic_training_per_loop_iteration=n_critic_training_per_loop_iteration,
+            n_actor_training_per_loop_iteration=n_actor_training_per_loop_iteration,
+            exploration_config=exploration_config,
+            tensorboard_log=tensorboard_log,
+            restore_path=restore_path,
+            path=f'{log_path}/{run_name}',
+        )
