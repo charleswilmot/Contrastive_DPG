@@ -66,6 +66,10 @@ if __name__ == '__main__':
 
 
     log_path = '../experiments'
+    os.makedirs(log_path, exist_ok=True)
+    checkpoints_path = '../checkpoints'
+    os.makedirs(checkpoints_path, exist_ok=True)
+
     ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
     if ids:
         exp_id = 1 + max(ids)
