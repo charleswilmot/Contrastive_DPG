@@ -43,7 +43,7 @@ if __name__ == '__main__':
     n_sim = 20
     batch_size = 4
     exploration_config = ExplorationConfig(
-        type="softmax_temperature",
+        type="exploration_prob",
         N=4000,
         interpolation_type='cosine',
         upsilon_t0=0.2,
