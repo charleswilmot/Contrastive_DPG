@@ -11,7 +11,7 @@ import logging
 import sys
 from distance_matrix import *
 import matplotlib
-matplotlib.use('TkAgg') # necessary to avoid conflict with Coppelia's Qt
+matplotlib.use('Agg') # necessary to avoid conflict with Coppelia's Qt
 import matplotlib.pyplot as plt
 from plots import *
 import numpy as np

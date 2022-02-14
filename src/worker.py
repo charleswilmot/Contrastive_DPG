@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg') # necessary to avoid conflict with Coppelia's Qt
+matplotlib.use('Agg') # necessary to avoid conflict with Coppelia's Qt
 from database import Database
 
 
