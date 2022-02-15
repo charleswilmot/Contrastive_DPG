@@ -6,6 +6,9 @@ from agent import Agent
 import os
 import re
 import datetime
+import sys
+from time import time
+from jax import random
 
 
 if __name__ == '__main__':
@@ -35,7 +38,7 @@ if __name__ == '__main__':
     actor_learning_rate = 2e-5 # used to be 2e-5
     critic_learning_rate = 1e-3
     action_dim = 7
-    n_sim = 20
+    n_sim = int(sys.argv[1])
     batch_size = 4
     exploration_config = ExplorationConfig(
         type="exploration_prob",
@@ -85,16 +88,16 @@ if __name__ == '__main__':
 
     args = [n_sim, batch_size, smoothing, episode_length, agent]
     with Experiment(*args) as experiment:
-        experiment.mainloop(
-            PRNGKey_start=PRNGKey_start,
-            lookback=lookback,
-            n_expl_ep_per_it=n_expl_ep_per_it,
-            n_nonexpl_ep_per_it=n_nonexpl_ep_per_it,
-            experiment_length_in_ep=experiment_length_in_ep,
-            n_critic_training_per_loop_iteration=n_critic_training_per_loop_iteration,
-            n_actor_training_per_loop_iteration=n_actor_training_per_loop_iteration,
-            exploration_config=exploration_config,
-            tensorboard_log=tensorboard_log,
-            restore_path=restore_path,
-            path=f'{log_path}/{run_name}',
-        )
+        key = random.PRNGKey(0)
+
+        # perform the jit compilation:
+        experiment.collect_episode_data(key, exploration_config.no_exploration, episode_length=2)
+
+        t0 = time()
+        experiment.collect_episode_data(key, exploration_config.no_exploration)
+        t1 = time()
+        experiment.collect_episode_data(key, exploration_config(0))
+        t2 = time()
+
+        print(f'* Non-exploratory: {episode_length * n_sim / (t1 - t0)} it/sec')
+        print(f'*     exploratory: {episode_length * n_sim / (t2 - t1)} it/sec')
