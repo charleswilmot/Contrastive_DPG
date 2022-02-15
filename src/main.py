@@ -57,7 +57,8 @@ if __name__ == '__main__':
     lookback = 4
     smoothing = 0.0  # 0.04
     PRNGKey_start = 0
-    n_episodes_per_loop_iteration = 160
+    n_expl_ep_per_it = 80
+    n_nonexpl_ep_per_it = 80
     experiment_length_in_ep = 16000
     n_critic_training_per_loop_iteration = 400
     n_actor_training_per_loop_iteration = 100
@@ -92,7 +93,8 @@ if __name__ == '__main__':
         experiment.mainloop(
             PRNGKey_start=PRNGKey_start,
             lookback=lookback,
-            n_episodes_per_loop_iteration=n_episodes_per_loop_iteration,
+            n_expl_ep_per_it=n_expl_ep_per_it,
+            n_nonexpl_ep_per_it=n_nonexpl_ep_per_it,
             experiment_length_in_ep=experiment_length_in_ep,
             n_critic_training_per_loop_iteration=n_critic_training_per_loop_iteration,
             n_actor_training_per_loop_iteration=n_actor_training_per_loop_iteration,

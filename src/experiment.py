@@ -354,15 +354,19 @@ class Experiment:
         videos = self.get_videos(n, smoothing, key, exploration, width=width, height=height)
         tensorboard.add_video(f'videos/{name}', videos, iteration, fps=25, dataformats='NTHWC')
 
-    def mainloop(self, PRNGKey_start, lookback, n_episodes_per_loop_iteration,
+    def mainloop(self, PRNGKey_start, lookback, n_expl_ep_per_it, n_nonexpl_ep_per_it,
         experiment_length_in_ep, n_critic_training_per_loop_iteration,
         n_actor_training_per_loop_iteration, exploration_config, tensorboard_log,
         restore_path, path, database=None, experiment_id=None):
 
-        if n_episodes_per_loop_iteration % self._n_sim != 0:
-            raise RuntimeError(f"{n_episodes_per_loop_iteration=} not divisible by {self._n_sim=}")
-        if experiment_length_in_ep % n_episodes_per_loop_iteration != 0:
-            raise RuntimeError(f"{n_episodes_per_loop_iteration=} not divisible by {self._n_sim=}")
+        n_ep_per_it = n_expl_ep_per_it + n_nonexpl_ep_per_it
+
+        if n_expl_ep_per_it % self._n_sim != 0:
+            raise RuntimeError(f"{n_expl_ep_per_it=} not divisible by {self._n_sim=}")
+        if n_nonexpl_ep_per_it % self._n_sim != 0:
+            raise RuntimeError(f"{n_nonexpl_ep_per_it=} not divisible by {self._n_sim=}")
+        if experiment_length_in_ep % n_ep_per_it != 0:
+            raise RuntimeError(f"{experiment_length_in_ep=} not divisible by {n_ep_per_it=}")
 
         if tensorboard_log:
             tensorboard = SummaryWriter(logdir=path)
@@ -371,54 +375,94 @@ class Experiment:
 
         subkey = random.PRNGKey(PRNGKey_start)
         original_key = subkey
-        n_data_collect = int(n_episodes_per_loop_iteration / self._n_sim)
-        CUTOFF = min(n_episodes_per_loop_iteration, 45)
+        n_expl_data_collect = n_expl_ep_per_it // self._n_sim
+        n_nonexpl_data_collect = n_nonexpl_ep_per_it // self._n_sim
+        CUTOFF = min(n_expl_ep_per_it, 45)
 
 
         with self:
             if restore_path is not None:
                 experiment.restore(restore_path)
-            data_buffer = np.zeros(shape=(n_episodes_per_loop_iteration * lookback, self._episode_length), dtype=self._dtype)
 
+            data_buffer = np.zeros(shape=(n_ep_per_it * lookback, self._episode_length), dtype=self._dtype)
+
+            # collect initial exploratory data
             data = self.collect_episode_data_multi(
-                n_data_collect * (lookback - 1),
+                n_expl_data_collect * (lookback - 1),
                 subkey,
                 exploration_config(0),
             )
+            start = n_ep_per_it
+            end = start + n_expl_ep_per_it * (lookback - 1)
+            data_buffer[start:end] = data
 
-            data_buffer[n_episodes_per_loop_iteration:] = data
-            for i in range(int(experiment_length_in_ep / n_episodes_per_loop_iteration)):
-                n_episodes = i * n_episodes_per_loop_iteration
+            # collect initial non-exploratory data
+            data = self.collect_episode_data_multi(
+                n_expl_data_collect * (lookback - 1),
+                subkey,
+                exploration_config.no_exploration,
+            )
+            start = end
+            end = start + n_nonexpl_ep_per_it * (lookback - 1)
+            data_buffer[start:end] = data
 
-                key, subkey = random.split(subkey)
+            for i in range(experiment_length_in_ep // n_ep_per_it):
+                n_episodes = i * n_ep_per_it
 
                 exploration = exploration_config(n_episodes)
+
+                # collect exploratory data
+                key, subkey = random.split(subkey)
                 data = self.collect_episode_data_multi(
-                    n_data_collect,
+                    n_expl_data_collect,
                     subkey,
                     exploration,
                 )
                 training_return = np.mean(np.sum(data["rewards"], axis=1))
 
-                start = (i % lookback) * n_episodes_per_loop_iteration
-                stop = ((i % lookback) + 1) * n_episodes_per_loop_iteration
+                start = (i % lookback) * n_ep_per_it
+                stop = start + n_expl_ep_per_it
+                self._logger.debug(f'filling buffer with exploratory data {start=} {stop=}')
                 data_buffer[start:stop] = data
 
-                self.full_critic_training(data_buffer, n_critic_training_per_loop_iteration, subkey, i, tensorboard=tensorboard)
-                self.full_actor_training(data_buffer, n_actor_training_per_loop_iteration, subkey, i, tensorboard=tensorboard)
-
-                testing_data = self.collect_episode_data_multi(
-                    max(20 // self._n_sim, 1),
+                # collect non-exploratory data
+                key, subkey = random.split(subkey)
+                data = self.collect_episode_data_multi(
+                    n_nonexpl_data_collect,
                     subkey,
                     exploration_config.no_exploration,
                 )
-                testing_return = np.mean(np.sum(testing_data["rewards"], axis=1))
+                testing_return = np.mean(np.sum(data["rewards"], axis=1))
 
+                start = (i % lookback) * n_ep_per_it + n_expl_ep_per_it
+                stop = start + n_nonexpl_ep_per_it
+                self._logger.debug(f'filling buffer with non exploratory data {start=} {stop=}')
+                data_buffer[start:stop] = data
+
+                # training critic
+                self.full_critic_training(
+                    data_buffer,
+                    n_critic_training_per_loop_iteration,
+                    subkey,
+                    i,
+                    tensorboard=tensorboard
+                )
+
+                # training actor
+                self.full_actor_training(
+                    data_buffer,
+                    n_actor_training_per_loop_iteration,
+                    subkey,
+                    i,
+                    tensorboard=tensorboard
+                )
+
+                # logging
                 if database is not None:
                     database.insert_result(
                         experiment_id,
                         loop_iteration=i,
-                        episode_nb=i * n_episodes_per_loop_iteration,
+                        episode_nb=i * n_expl_ep_per_it,
                         training_episode_return=training_return,
                         testing_episode_return=testing_return,
                         exploration_param=exploration.param,

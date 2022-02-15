@@ -81,7 +81,8 @@ class Database:
                      episode_length INTEGER NOT NULL,
                      lookback INTEGER NOT NULL,
                      smoothing FLOAT NOT NULL,
-                     n_episodes_per_loop_iteration INTEGER NOT NULL,
+                     n_expl_ep_per_it INTEGER NOT NULL,
+                     n_nonexpl_ep_per_it INTEGER NOT NULL,
                      experiment_length_in_ep INTEGER NOT NULL,
                      n_critic_training_per_loop_iteration INTEGER NOT NULL,
                      n_actor_training_per_loop_iteration INTEGER NOT NULL,
@@ -105,13 +106,14 @@ class Database:
                         episode_length,
                         lookback,
                         smoothing,
-                        n_episodes_per_loop_iteration,
+                        n_expl_ep_per_it,
+                        n_nonexpl_ep_per_it,
                         experiment_length_in_ep,
                         n_critic_training_per_loop_iteration,
                         n_actor_training_per_loop_iteration
                      ),
-                     CONSTRAINT CC_divisible_n_sim CHECK (n_episodes_per_loop_iteration % n_sim = 0),
-                     CONSTRAINT CC_divisible_n_ep CHECK (experiment_length_in_ep % n_episodes_per_loop_iteration = 0)
+                     CONSTRAINT CC_divisible_n_sim CHECK (n_expl_ep_per_it % n_sim = 0 AND n_nonexpl_ep_per_it % n_sim = 0),
+                     CONSTRAINT CC_divisible_n_ep CHECK (experiment_length_in_ep % (n_expl_ep_per_it + n_nonexpl_ep_per_it) = 0)
                   );'''
         self.cursor.execute(command)
         command = '''CREATE TABLE IF NOT EXISTS experiments (
@@ -159,22 +161,22 @@ class Database:
                   );'''
         self.cursor.execute(command)
 
-    def add_to_collection(self, experiment_config_id, collection):
+    def add_to_collection(self, experiment_config_id, collection, or_ignore=False):
         self.insert_into("collections", {
             "collection": collection
-        })
+        }, or_ignore=or_ignore)
         self.insert_into("collections_experiment_config", {
             "collection": collection,
             "experiment_config_id": experiment_config_id
-        })
+        }, or_ignore=or_ignore)
 
     def insert_experiment_config(self,
             hierarchization_config_id, exploration_config_id, repetitions_total, restore_path, n_sim,
             discount_factor, noise_magnitude_limit, hierarchization_coef,
             actor_learning_rate, critic_learning_rate, batch_size,
-            episode_length, lookback, smoothing, n_episodes_per_loop_iteration,
+            episode_length, lookback, smoothing, n_expl_ep_per_it, n_nonexpl_ep_per_it,
             experiment_length_in_ep, n_critic_training_per_loop_iteration,
-            n_actor_training_per_loop_iteration):
+            n_actor_training_per_loop_iteration, or_ignore=False):
         return self.insert_into("experiment_configs", {
             "hierarchization_config_id": hierarchization_config_id,
             "exploration_config_id": exploration_config_id,
@@ -193,25 +195,26 @@ class Database:
             "episode_length": episode_length,
             "lookback": lookback,
             "smoothing": smoothing,
-            "n_episodes_per_loop_iteration": n_episodes_per_loop_iteration,
+            "n_expl_ep_per_it": n_expl_ep_per_it,
+            "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
             "experiment_length_in_ep": experiment_length_in_ep,
             "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
             "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
-        })
+        }, or_ignore=or_ignore)
 
     def insert_experiment(self, experiment_config_id, PRNGKey_start, date_time_start,
-            hourly_pricing, path):
+            hourly_pricing, path, or_ignore=False):
         return self.insert_into("experiments", {
             "experiment_config_id": experiment_config_id,
             "PRNGKey_start": PRNGKey_start,
             "date_time_start": date_time_start,
             "hourly_pricing": hourly_pricing,
             "path": path,
-        })
+        }, or_ignore=or_ignore)
 
     def insert_exploration_config(self, type, N, interpolation_type, upsilon_t0,
             upsilon_tN, exploration_prob_t0, exploration_prob_tN,
-            softmax_temperature_t0, softmax_temperature_tN):
+            softmax_temperature_t0, softmax_temperature_tN, or_ignore=False):
         return self.insert_into("exploration_configs", {
             "type": type,
             "N": N,
@@ -222,16 +225,16 @@ class Database:
             "exploration_prob_tN": exploration_prob_tN,
             "softmax_temperature_t0": softmax_temperature_t0,
             "softmax_temperature_tN": softmax_temperature_tN,
-        })
+        }, or_ignore=or_ignore)
 
-    def insert_hierarchization_config(self, n_actors, hierarchization_config):
+    def insert_hierarchization_config(self, n_actors, hierarchization_config, or_ignore=False):
         return self.insert_into("hierarchization_configs", {
             "n_actors": n_actors,
             "hierarchization_config": pickle.dumps(hierarchization_config),
-        })
+        }, or_ignore=or_ignore)
 
     def insert_result(self, experiment_id, loop_iteration, episode_nb,
-        training_episode_return, testing_episode_return, exploration_param):
+        training_episode_return, testing_episode_return, exploration_param, or_ignore=False):
         self.insert_into("results", {
             "experiment_id": experiment_id,
             "loop_iteration": loop_iteration,
@@ -239,11 +242,12 @@ class Database:
             "training_episode_return": training_episode_return,
             "testing_episode_return": testing_episode_return,
             "exploration_param": exploration_param,
-        })
+        }, or_ignore=or_ignore)
 
-    def insert_into(self, table_name, name_values_dict):
+    def insert_into(self, table_name, name_values_dict, or_ignore=False):
+        OR_IGNORE = "OR IGNOER" if or_ignore else ""
         command = ""
-        command += f"INSERT INTO {table_name}(\n    "
+        command += f"INSERT {OR_IGNORE} INTO {table_name}(\n    "
         command += ",\n    ".join(name_values_dict.keys())
         command += f"\n) VALUES ({','.join(['?'] * len(name_values_dict))})"
         command_get_id = "SELECT last_insert_rowid()"
@@ -340,7 +344,8 @@ class Database:
                 episode_length,
                 lookback,
                 smoothing,
-                n_episodes_per_loop_iteration,
+                n_expl_ep_per_it,
+                n_nonexpl_ep_per_it,
                 experiment_length_in_ep,
                 n_critic_training_per_loop_iteration,
                 n_actor_training_per_loop_iteration,
@@ -370,7 +375,8 @@ class Database:
         mainloop_args = (
             PRNGKey_start,
             lookback,
-            n_episodes_per_loop_iteration,
+            n_expl_ep_per_it,
+            n_nonexpl_ep_per_it,
             experiment_length_in_ep,
             n_critic_training_per_loop_iteration,
             n_actor_training_per_loop_iteration,
@@ -435,7 +441,8 @@ if __name__ == '__main__':
     episode_length = 100
     lookback = 4
     smoothing = 0.0
-    n_episodes_per_loop_iteration = 160
+    n_expl_ep_per_it = 80
+    n_nonexpl_ep_per_it = 80
     experiment_length_in_ep = 32000
     n_critic_training_per_loop_iteration = 400
     n_actor_training_per_loop_iteration = 100
@@ -482,7 +489,8 @@ if __name__ == '__main__':
         episode_length,
         lookback,
         smoothing,
-        n_episodes_per_loop_iteration,
+        n_expl_ep_per_it,
+        n_nonexpl_ep_per_it,
         experiment_length_in_ep,
         n_critic_training_per_loop_iteration,
         n_actor_training_per_loop_iteration,
