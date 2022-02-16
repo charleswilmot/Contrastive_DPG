@@ -27,7 +27,7 @@ class Database:
         self._logger.info(f"[database] opening {path}")
         self.path = path
         self.conn = sql.connect(path, detect_types=sql.PARSE_DECLTYPES)
-        self.conn.set_trace_callback(self._logger.debug)
+        # self.conn.set_trace_callback(self._logger.debug)
         self.cursor = self.conn.cursor()
         command = 'PRAGMA foreign_keys = ON;'
         self.cursor.execute(command)
@@ -163,23 +163,23 @@ class Database:
                   );'''
         self.cursor.execute(command)
 
-    def add_to_collection(self, experiment_config_id, collection, or_ignore=False):
+    def add_to_collection(self, experiment_config_id, collection, protect=True):
         self.insert_into("collections", {
             "collection": collection
-        }, or_ignore=or_ignore)
+        }, protect=protect)
         self.insert_into("collections_experiment_config", {
             "collection": collection,
             "experiment_config_id": experiment_config_id
-        }, or_ignore=or_ignore)
+        }, protect=protect)
 
     def insert_experiment_config(self,
             hierarchization_config_id, exploration_config_id, repetitions_total, restore_path, n_sim,
             discount_factor, noise_magnitude_limit, hierarchization_coef,
             actor_learning_rate, critic_learning_rate, batch_size,
             episode_length, lookback, smoothing, n_expl_ep_per_it, n_nonexpl_ep_per_it,
-            experiment_length_in_ep, n_critic_training_per_loop_iteration,
-            n_actor_training_per_loop_iteration, or_ignore=False):
-        return self.insert_into("experiment_configs", {
+            experiment_length_in_ep, n_actor_pretraining, n_critic_training_per_loop_iteration,
+            n_actor_training_per_loop_iteration, protect=True):
+        self.insert_into("experiment_configs", {
             "hierarchization_config_id": hierarchization_config_id,
             "exploration_config_id": exploration_config_id,
             "repetitions_total": repetitions_total,
@@ -203,22 +203,50 @@ class Database:
             "n_actor_pretraining": n_actor_pretraining,
             "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
             "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
-        }, or_ignore=or_ignore)
+        }, protect=protect)
+        id = self.select_into("experiment_configs", ["experiment_config_id"], {
+            "restore_path": restore_path,
+            "hierarchization_config_id": hierarchization_config_id,
+            "exploration_config_id": exploration_config_id,
+            "discount_factor": discount_factor,
+            "noise_magnitude_limit": noise_magnitude_limit,
+            "hierarchization_coef": hierarchization_coef,
+            "actor_learning_rate": actor_learning_rate,
+            "critic_learning_rate": critic_learning_rate,
+            "batch_size": batch_size,
+            "episode_length": episode_length,
+            "lookback": lookback,
+            "smoothing": smoothing,
+            "n_expl_ep_per_it": n_expl_ep_per_it,
+            "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
+            "experiment_length_in_ep": experiment_length_in_ep,
+            "n_actor_pretraining": n_actor_pretraining,
+            "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
+            "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
+        })[0][0]
+        self._logger.info(f"The new entry has id {id}")
+        return id
 
     def insert_experiment(self, experiment_config_id, PRNGKey_start, date_time_start,
-            hourly_pricing, path, or_ignore=False):
-        return self.insert_into("experiments", {
+            hourly_pricing, path, protect=True):
+        self.insert_into("experiments", {
             "experiment_config_id": experiment_config_id,
             "PRNGKey_start": PRNGKey_start,
             "date_time_start": date_time_start,
             "hourly_pricing": hourly_pricing,
             "path": path,
-        }, or_ignore=or_ignore)
+        }, protect=protect)
+        id = self.select_into("experiments", ["experiment_id"], {
+            "experiment_config_id": experiment_config_id,
+            "PRNGKey_start": PRNGKey_start,
+        })[0][0]
+        self._logger.info(f"The new entry has id {id}")
+        return id
 
     def insert_exploration_config(self, type, N, interpolation_type, upsilon_t0,
             upsilon_tN, exploration_prob_t0, exploration_prob_tN,
-            softmax_temperature_t0, softmax_temperature_tN, or_ignore=False):
-        return self.insert_into("exploration_configs", {
+            softmax_temperature_t0, softmax_temperature_tN, protect=True):
+        self.insert_into("exploration_configs", {
             "type": type,
             "N": N,
             "interpolation_type": interpolation_type,
@@ -228,16 +256,35 @@ class Database:
             "exploration_prob_tN": exploration_prob_tN,
             "softmax_temperature_t0": softmax_temperature_t0,
             "softmax_temperature_tN": softmax_temperature_tN,
-        }, or_ignore=or_ignore)
+        }, protect=protect)
+        id = self.select_into("exploration_configs", ["exploration_config_id"], {
+            "type": type,
+            "N": N,
+            "interpolation_type": interpolation_type,
+            "upsilon_t0": upsilon_t0,
+            "upsilon_tN": upsilon_tN,
+            "exploration_prob_t0": exploration_prob_t0,
+            "exploration_prob_tN": exploration_prob_tN,
+            "softmax_temperature_t0": softmax_temperature_t0,
+            "softmax_temperature_tN": softmax_temperature_tN,
+        })[0][0]
+        self._logger.info(f"The new entry has id {id}")
+        return id
 
-    def insert_hierarchization_config(self, n_actors, hierarchization_config, or_ignore=False):
-        return self.insert_into("hierarchization_configs", {
+    def insert_hierarchization_config(self, n_actors, hierarchization_config, protect=True):
+        self.insert_into("hierarchization_configs", {
             "n_actors": n_actors,
             "hierarchization_config": pickle.dumps(hierarchization_config),
-        }, or_ignore=or_ignore)
+        }, protect=protect)
+        id = self.select_into("hierarchization_configs", ["hierarchization_config_id"], {
+            "n_actors": n_actors,
+            "hierarchization_config": pickle.dumps(hierarchization_config),
+        })[0][0]
+        self._logger.info(f"The new entry has id {id}")
+        return id
 
     def insert_result(self, experiment_id, loop_iteration, episode_nb,
-        training_episode_return, testing_episode_return, exploration_param, or_ignore=False):
+        training_episode_return, testing_episode_return, exploration_param, protect=True):
         self.insert_into("results", {
             "experiment_id": experiment_id,
             "loop_iteration": loop_iteration,
@@ -245,20 +292,36 @@ class Database:
             "training_episode_return": training_episode_return,
             "testing_episode_return": testing_episode_return,
             "exploration_param": exploration_param,
-        }, or_ignore=or_ignore)
+        }, protect=protect)
 
-    def insert_into(self, table_name, name_values_dict, or_ignore=False):
-        OR_IGNORE = "OR IGNOER" if or_ignore else ""
+    def insert_into(self, table_name, name_values_dict, protect=True):
+        duplicate = False
+        self._logger.info(f'Inserting new data into table {table_name} ({protect=})')
         command = ""
-        command += f"INSERT {OR_IGNORE} INTO {table_name}(\n    "
+        command += f"INSERT INTO {table_name}(\n    "
         command += ",\n    ".join(name_values_dict.keys())
         command += f"\n) VALUES ({','.join(['?'] * len(name_values_dict))})"
-        command_get_id = "SELECT last_insert_rowid()"
-        with self.conn:
+        try:
             self.cursor.execute(command, tuple(name_values_dict.values()))
-            self.conn.commit()
-            self.cursor.execute(command_get_id)
-            return self.cursor.fetchone()[0]
+        except sql.IntegrityError as e:
+            if str(e).startswith("UNIQUE constraint failed"):
+                duplicate = True
+                if protect:
+                    self._logger.critical(f"Trying to violate UNIQUE constraint ({table_name=})")
+                    raise e
+                else:
+                    self._logger.info(f"The entry is already present in {table_name}")
+            else:
+                raise e
+        self.conn.commit()
+        return duplicate
+
+    def select_into(self, table_name, columns, name_values_dict):
+        command = f"SELECT {','.join(columns)} FROM {table_name} WHERE (\n    "
+        command += ' AND\n    '.join([f"{name} IS ?" if val is None else f"{name}=?" for name, val in name_values_dict.items()])
+        command += '\n)'
+        self.cursor.execute(command, tuple(name_values_dict.values()))
+        return self.cursor.fetchall()
 
     def get_dataframe(self, command):
         return pd.read_sql(command, self.conn)
