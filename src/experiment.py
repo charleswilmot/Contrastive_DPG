@@ -302,16 +302,15 @@ class Experiment:
             )
             if tensorboard is not None:
                 tensorboard.add_scalar("perf/actor_pretraining", infos["mean_hierarchy_loss"], i)
+
+    def log_data(self, tensorboard, training_data, testing_data, iteration, exploration):
         self._agent.log_data(
                     self._actor_params,
                     self._critic_params,
-                    jnp.concatenate([data["states"], data["goals"]], axis=-1),
-                    data["actions"],
-                    data["rewards"],
+                    training_data,
+                    testing_data,
                     tensorboard,
                     iteration,
-                    training_return,
-                    testing_return,
                     exploration,
         )
 
@@ -442,31 +441,29 @@ class Experiment:
 
                 # collect exploratory data
                 key, subkey = random.split(subkey)
-                data = self.collect_episode_data_multi(
+                training_data = self.collect_episode_data_multi(
                     n_expl_data_collect,
                     subkey,
                     exploration,
                 )
-                training_return = np.mean(np.sum(data["rewards"], axis=1))
+                training_return = np.mean(np.sum(training_data["rewards"], axis=1))
 
                 start = (i % lookback) * n_ep_per_it
                 stop = start + n_expl_ep_per_it
-                self._logger.debug(f'filling buffer with exploratory data {start=} {stop=}')
-                data_buffer[start:stop] = data
+                data_buffer[start:stop] = training_data
 
                 # collect non-exploratory data
                 key, subkey = random.split(subkey)
-                data = self.collect_episode_data_multi(
+                testing_data = self.collect_episode_data_multi(
                     n_nonexpl_data_collect,
                     subkey,
                     exploration_config.no_exploration,
                 )
-                testing_return = np.mean(np.sum(data["rewards"], axis=1))
+                testing_return = np.mean(np.sum(testing_data["rewards"], axis=1))
 
                 start = (i % lookback) * n_ep_per_it + n_expl_ep_per_it
                 stop = start + n_nonexpl_ep_per_it
-                self._logger.debug(f'filling buffer with non exploratory data {start=} {stop=}')
-                data_buffer[start:stop] = data
+                data_buffer[start:stop] = testing_data
 
                 # training critic
                 self.full_critic_training(
@@ -500,9 +497,8 @@ class Experiment:
                 if tensorboard is not None:
                     self.log_data(
                         tensorboard=tensorboard,
-                        data=data[:CUTOFF],
+                        training_data=training_data[:CUTOFF],
+                        testing_data=testing_data[:CUTOFF],
                         iteration=i,
-                        training_return=training_return,
-                        testing_return=testing_return,
                         exploration=exploration,
                     )

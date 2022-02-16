@@ -325,20 +325,25 @@ class Agent:
         return log
 
     # @partial(jax.jit, static_argnums=(0, 6))
-    def log_data(self, actor_params, critic_params, states, actions, rewards, tensorboard, iteration, training_return, testing_return, expl):
+    def log_data(self, actor_params, critic_params, training_data, testing_data, tensorboard, iteration, expl):
         '''
         states: dimension [BATCH, SEQUENCE, STATE_DIM]
         actions: dimension [BATCH, SEQUENCE, ACTION_DIM]
         rewards: dimension [BATCH, SEQUENCE]
         '''
         self._logger.info('logging to tensorboard')
+
+        tensorboard.add_scalar('perf/training_return', jnp.mean(jnp.sum(training_data["rewards"], axis=-1)), iteration)
+        tensorboard.add_scalar('perf/testing_return', jnp.mean(jnp.sum(testing_data["rewards"], axis=-1)), iteration)
+
+        states = jnp.concatenate([training_data["states"], training_data["goals"]], axis=-1)
+        actions = training_data["actions"]
+        rewards = training_data["rewards"]
+
         BATCH_SIZE = 15
         N = len(states)
         slices = tuple(slice(i, i + BATCH_SIZE) for i in range(0, N, BATCH_SIZE))
         acc = defaultdict(int)
-
-        tensorboard.add_scalar('perf/training_return', training_return, iteration)
-        tensorboard.add_scalar('perf/testing_return', testing_return, iteration)
 
         for batch_num, s in enumerate(slices):
             self._logger.info(f'logging to tensorboard {batch_num+1}/{len(slices)}')
