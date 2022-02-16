@@ -39,12 +39,12 @@ if __name__ == '__main__':
     batch_size = 4
     exploration_config = ExplorationConfig(
         type="exploration_prob",
-        N=4000,
+        N=6000,
         interpolation_type='cosine',
         upsilon_t0=0.2,
         upsilon_tN=0.6,
         exploration_prob_t0=0.9,
-        exploration_prob_tN=0.1,
+        exploration_prob_tN=0.05,
         softmax_temperature_t0=1.0,
         softmax_temperature_tN=0.25,
     )
@@ -52,8 +52,8 @@ if __name__ == '__main__':
     lookback = 4
     smoothing = 0.0  # 0.04
     PRNGKey_start = 0
-    n_expl_ep_per_it = 80
-    n_nonexpl_ep_per_it = 80
+    n_expl_ep_per_it = 120
+    n_nonexpl_ep_per_it = 40
     experiment_length_in_ep = 16000
     n_actor_pretraining = 100
     n_critic_training_per_loop_iteration = 400
