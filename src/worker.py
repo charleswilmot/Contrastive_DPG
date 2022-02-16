@@ -1,23 +1,23 @@
 import matplotlib
 matplotlib.use('Agg') # necessary to avoid conflict with Coppelia's Qt
 from database import Database
-
-
-def Agent(*args):
-    print(args)
-
-
-class Experiment:
-    def __init__(self, *args):
-        print(args)
-    def mainloop(self, *args):
-        print(args)
+import logging
+import sys
+import os
+import re
+import datetime
+from experiment import Experiment
+from agent import Agent
 
 
 if __name__ == '__main__':
-    import sys
-    import os
-    import datetime
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
 
     db = Database(sys.argv[1])
 
@@ -34,6 +34,13 @@ if __name__ == '__main__':
             exp_id = 0
         run_name = f'{exp_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
         path = f'{log_path}/{run_name}'
+        os.makedirs(path, exist_ok=True)
+
+        file_handler = logging.FileHandler(f"{path}/output.log")
+        formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
 
         with db.get_a_job(path) as args:
             if args is not None:
@@ -42,3 +49,5 @@ if __name__ == '__main__':
                     experiment.mainloop(*args.mainloop)
             else:
                 done = True
+
+        logger.removeHandler(file_handler)

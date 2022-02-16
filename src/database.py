@@ -18,12 +18,6 @@ Args = namedtuple("Args", ["agent", "experiment", "mainloop"])
 class Database:
     def __init__(self, path):
         self._logger = logging.getLogger("Database")
-        self._logger.propagate = False
-        self._logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
         self._logger.info(f"[database] opening {path}")
         self.path = path
         self.conn = sql.connect(path, detect_types=sql.PARSE_DECLTYPES)
@@ -438,7 +432,7 @@ class Database:
             critic_learning_rate,
             ACTION_DIM
         )
-        experiment_args = (n_sim, batch_size, episode_length)
+        experiment_args = (n_sim, batch_size, smoothing, episode_length)
         mainloop_args = (
             PRNGKey_start,
             lookback,
@@ -457,9 +451,9 @@ class Database:
         )
         try:
             yield Args(agent_args, experiment_args, mainloop_args)
-        except Exception as e:
+        except:
             with self.conn:
-                self._logger.critical("An exception has occured, deleting the experiment {experiment_id}")
+                self._logger.critical(f"An exception has occured, deleting the experiment {experiment_id}")
                 self.delete_experiment(experiment_id)
                 self._logger.critical("An exception has occured, incrementing the 'remaining' counter")
                 command = f'''UPDATE experiment_configs
@@ -469,7 +463,7 @@ class Database:
                                 experiment_config_id={experiment_config_id}
                               '''
                 self.cursor.execute(command)
-                raise e
+            raise
         finally:
             with self.conn:
                 command = f'''UPDATE experiment_configs

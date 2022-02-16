@@ -32,12 +32,6 @@ class Agent:
             critic_learning_rate,
             actions_dim):
         self._logger = logging.getLogger("Agent")
-        self._logger.propagate = False
-        self._logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
         self._logger.info("initializing...")
         self._discount_factor = discount_factor # 0.96
         self._noise_magnitude_limit = noise_magnitude_limit # 0.2

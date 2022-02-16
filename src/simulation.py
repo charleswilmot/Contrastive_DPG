@@ -624,12 +624,6 @@ class SimulationProducer(object):
         self._consumer = SimulationConsumer(self._process_io, scene, gui=gui)
         self._consumer.start()
         self._logger = logging.getLogger(f"Simulation({self._consumer._id: 2d})")
-        self._logger.propagate = False
-        self._logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(f'%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
         self._logger.info("consumer {} started".format(self._consumer._id))
         self._closed = False
         # atexit.register(self.close)
@@ -689,8 +683,11 @@ class SimulationProducer(object):
                 if self._consumer.exitcode is None:
                     self._logger.warning(f"joining ({timeout}) after SIGTERM ... failed")
             else:
-                self._logger.debug(f"joining ({timeout}) ... joined!")
-                self._logger.info(f"Coppelia closed")
+                try:
+                    self._logger.debug(f"joining ({timeout}) ... joined!")
+                    self._logger.info(f"Coppelia closed")
+                except LookupError:
+                    pass
 
     def _wait_command_pipe_empty(self, timeout=None):
         self._send_command(SimulationConsumer.signal_command_pipe_empty)

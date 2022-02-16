@@ -25,12 +25,6 @@ def compute_reward(registers_tm1, registers_t, goals):
 class Experiment:
     def __init__(self, n_sim, batch_size, smoothing, episode_length, agent):
         self._logger = logging.getLogger("Experiment")
-        self._logger.propagate = False
-        self._logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
         self._logger.info(f"initializing...")
         self._n_sim = n_sim
         self._batch_size = batch_size
