@@ -63,7 +63,6 @@ class Experiment:
             ("actions", np.float32, self._actions_dim),
             ("rewards", np.float32),
         ])
-        self._data_buffer = np.zeros(shape=(self._n_sim, self._episode_length), dtype=self._dtype)
         self._logger.info(f"initializing... done")
 
     def close(self):
@@ -407,7 +406,7 @@ class Experiment:
 
 
         with self:
-            if restore_path is not None:
+            if restore_path:
                 experiment.restore(restore_path)
 
             data_buffer = np.zeros(shape=(n_ep_per_it * lookback, self._episode_length), dtype=self._dtype)
@@ -424,7 +423,7 @@ class Experiment:
 
             # collect initial non-exploratory data
             data = self.collect_episode_data_multi(
-                n_expl_data_collect * (lookback - 1),
+                n_nonexpl_data_collect * (lookback - 1),
                 subkey,
                 exploration_config.no_exploration,
             )
