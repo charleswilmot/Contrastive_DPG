@@ -92,7 +92,7 @@ def plot_probabilities_hierarchy(recomputed_returns, hierarchization_config, exp
     return plot_hierarchy(
         probs,
         hierarchization_config,
-        func=lambda subdata, _a, _b: np.sort(subdata, axis=-1),
+        # func=lambda subdata, _a, _b: np.sort(subdata, axis=-1),
     )
 
 
@@ -100,7 +100,7 @@ def plot_returns_hierarchy(recomputed_returns, hierarchization_config, cmap='hot
     return plot_hierarchy(
         recomputed_returns,
         hierarchization_config,
-        func=lambda subdata, _a, _b: np.sort(subdata, axis=-1),
+        # func=lambda subdata, _a, _b: np.sort(subdata, axis=-1),
     )
 
 
@@ -110,7 +110,8 @@ def plot_loss_hierarchy(recomputed_returns, hierarchization_config, cmap='hot'):
         dm = distance_matrix(euclidian_distance, subdata, axis=level) # shape [dim0, dim1, ..., dim(level), dim(level)]
         energy = softplus_sink(dm, *hierarchization_config[level][1:])
         N = level_config[0]
-        return np.sort(np.sum(energy, axis=-1), axis=-1) / (N - 1)
+        # return np.sort(np.sum(energy, axis=-1), axis=-1) / (N - 1)
+        return np.sum(energy, axis=-1) / (N - 1)
 
     return plot_hierarchy(
         recomputed_returns,
@@ -127,7 +128,8 @@ def plot_min_distance_hierarchy(recomputed_returns, hierarchization_config, cmap
         # 1e-3 because of the small epsilon in the euclidian_distance function definition
         dm = np.ma.masked_equal(dm, 1e-3) # shape [dim0, dim1, ..., dim(level), dim(level)]
         min_dist = np.min(dm, axis=level)
-        return np.sort(min_dist, axis=-1)
+        # return np.sort(min_dist, axis=-1)
+        return min_dist
 
     return plot_hierarchy(
         recomputed_returns,
@@ -144,7 +146,8 @@ def plot_max_distance_hierarchy(recomputed_returns, hierarchization_config, cmap
         # 1e-3 because of the small epsilon in the euclidian_distance function definition
         dm = np.ma.masked_equal(dm, 1e-3) # shape [dim0, dim1, ..., dim(level), dim(level)]
         max_dist = np.max(dm, axis=level)
-        return np.sort(max_dist, axis=-1)
+        # return np.sort(max_dist, axis=-1)
+        return max_dist
 
     return plot_hierarchy(
         recomputed_returns,
@@ -171,11 +174,11 @@ if __name__ == '__main__':
     recomputed_actions = np.random.uniform(size=(N_ACTORS, 7), low=-1, high=1)
 
 
-    # plot_returns_hierarchy(recomputed_returns, hierarchization_config)
-    # plt.show()
+    plot_returns_hierarchy(recomputed_returns, hierarchization_config)
+    plt.show()
 
     # plot_loss_hierarchy(recomputed_actions, hierarchization_config)
     # plt.show()
 
-    plot_min_distance_hierarchy(recomputed_actions, hierarchization_config)
-    plt.show()
+    # plot_min_distance_hierarchy(recomputed_actions, hierarchization_config)
+    # plt.show()
