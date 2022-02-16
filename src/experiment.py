@@ -117,6 +117,15 @@ class Experiment:
         )
         return infos
 
+    def pretrain_actor(self, states, goals):
+        ######### self._logger.info(f'training actor {states.shape=} {goals.shape=}')
+        self._actor_params, self._actor_learner_state, infos = self._agent.actor_pretraining_step(
+            self._actor_learner_state,
+            self._actor_params,
+            jnp.concatenate([states, goals], axis=-1),
+        )
+        return infos
+
     def train_critic(self, states, goals, actions, rewards):
         ######### self._logger.info(f'training critic {states.shape=} {goals.shape=} {actions.shape=} {rewards.shape=}')
         self._critic_params, self._critic_learner_state, infos = self._agent.critic_learning_step(
@@ -274,7 +283,25 @@ class Experiment:
             fig.tight_layout()
             tensorboard.add_figure('training/mean_smoothing', fig, iteration, close=True)
 
-    def log_data(self, tensorboard, data, iteration, training_return, testing_return, exploration):
+    def full_actor_pretraining(self, data, n, key, tensorboard=None):
+        self._logger.info(f'full actor pre-training {data.shape=}')
+        key, subkey = random.split(key)
+        for i in range(n):
+            self._logger.info(f'pre-training  --  {i+1}/{n}')
+            key, subkey = random.split(subkey)
+            indices = random.choice(
+                subkey,
+                data.shape[0],
+                shape=(self._batch_size, ),
+                replace=False,
+            )
+            batch = data[np.asarray(indices)]
+            infos = self.pretrain_actor(
+                batch["states"],
+                batch["goals"],
+            )
+            if tensorboard is not None:
+                tensorboard.add_scalar("perf/actor_pretraining", infos["mean_hierarchy_loss"], i)
         self._agent.log_data(
                     self._actor_params,
                     self._critic_params,
@@ -355,7 +382,7 @@ class Experiment:
         tensorboard.add_video(f'videos/{name}', videos, iteration, fps=25, dataformats='NTHWC')
 
     def mainloop(self, PRNGKey_start, lookback, n_expl_ep_per_it, n_nonexpl_ep_per_it,
-        experiment_length_in_ep, n_critic_training_per_loop_iteration,
+        experiment_length_in_ep, n_actor_pretraining, n_critic_training_per_loop_iteration,
         n_actor_training_per_loop_iteration, exploration_config, tensorboard_log,
         restore_path, path, database=None, experiment_id=None):
 
@@ -405,6 +432,8 @@ class Experiment:
             start = end
             end = start + n_nonexpl_ep_per_it * (lookback - 1)
             data_buffer[start:end] = data
+
+            self.full_actor_pretraining(data_buffer[n_ep_per_it:], n_actor_pretraining, subkey, tensorboard)
 
             for i in range(experiment_length_in_ep // n_ep_per_it):
                 n_episodes = i * n_ep_per_it

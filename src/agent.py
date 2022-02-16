@@ -172,6 +172,16 @@ class Agent:
         return actor_params, learner_state, infos
 
     @partial(jax.jit, static_argnums=(0,))
+    def actor_pretraining_step(self, learner_state, actor_params, states):
+        infos = {}
+        actions_before = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        hierarchization_loss_value, dloss_dtheta = jax.value_and_grad(self._hierarchization_loss)(actor_params, states)
+        infos["mean_hierarchy_loss"] = jnp.mean(hierarchization_loss_value)
+        updates, learner_state = self._actor_optimizer.update(dloss_dtheta, learner_state)
+        actor_params = optax.apply_updates(actor_params, updates)
+        return actor_params, learner_state, infos
+
+    @partial(jax.jit, static_argnums=(0,))
     def critic_learning_step(self, learner_state, actor_params, critic_params, states, actions, rewards):
         infos = {}
         critic_loss_value, dloss_dtheta = jax.value_and_grad(self._critic_loss, argnums=1)(actor_params, critic_params, states, actions, rewards)
@@ -179,6 +189,14 @@ class Agent:
         updates, learner_state = self._critic_optimizer.update(dloss_dtheta, learner_state)
         critic_params = optax.apply_updates(critic_params, updates)
         return critic_params, learner_state, infos
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _hierarchization_loss(self, actor_params, states):
+        actions = self._policy_network.apply(actor_params, states) # shape [N_ACTORS, BATCH, SEQUENCE, ACTION_DIM]
+        if self._hierarchization_coef != 0.0:
+            return self._hierarchization_coef * get_hierarchization_loss(actions, self._hierarchization_config)
+        else:
+            return 0
 
     @partial(jax.jit, static_argnums=(0,))
     def _actor_loss(self, actor_params, critic_params, states):

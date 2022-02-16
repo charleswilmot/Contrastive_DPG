@@ -55,6 +55,7 @@ if __name__ == '__main__':
     n_expl_ep_per_it = 80
     n_nonexpl_ep_per_it = 80
     experiment_length_in_ep = 16000
+    n_actor_pretraining = 100
     n_critic_training_per_loop_iteration = 400
     n_actor_training_per_loop_iteration = 100
     tensorboard_log = True
@@ -91,6 +92,7 @@ if __name__ == '__main__':
             n_expl_ep_per_it=n_expl_ep_per_it,
             n_nonexpl_ep_per_it=n_nonexpl_ep_per_it,
             experiment_length_in_ep=experiment_length_in_ep,
+            n_actor_pretraining=n_actor_pretraining,
             n_critic_training_per_loop_iteration=n_critic_training_per_loop_iteration,
             n_actor_training_per_loop_iteration=n_actor_training_per_loop_iteration,
             exploration_config=exploration_config,

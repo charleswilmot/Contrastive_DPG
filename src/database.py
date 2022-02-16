@@ -84,6 +84,7 @@ class Database:
                      n_expl_ep_per_it INTEGER NOT NULL,
                      n_nonexpl_ep_per_it INTEGER NOT NULL,
                      experiment_length_in_ep INTEGER NOT NULL,
+                     n_actor_pretraining INTEGER NOT NULL,
                      n_critic_training_per_loop_iteration INTEGER NOT NULL,
                      n_actor_training_per_loop_iteration INTEGER NOT NULL,
 
@@ -109,6 +110,7 @@ class Database:
                         n_expl_ep_per_it,
                         n_nonexpl_ep_per_it,
                         experiment_length_in_ep,
+                        n_actor_pretraining,
                         n_critic_training_per_loop_iteration,
                         n_actor_training_per_loop_iteration
                      ),
@@ -198,6 +200,7 @@ class Database:
             "n_expl_ep_per_it": n_expl_ep_per_it,
             "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
             "experiment_length_in_ep": experiment_length_in_ep,
+            "n_actor_pretraining": n_actor_pretraining,
             "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
             "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
         }, or_ignore=or_ignore)
@@ -347,6 +350,7 @@ class Database:
                 n_expl_ep_per_it,
                 n_nonexpl_ep_per_it,
                 experiment_length_in_ep,
+                n_actor_pretraining,
                 n_critic_training_per_loop_iteration,
                 n_actor_training_per_loop_iteration,
             ) = res
@@ -378,6 +382,7 @@ class Database:
             n_expl_ep_per_it,
             n_nonexpl_ep_per_it,
             experiment_length_in_ep,
+            n_actor_pretraining,
             n_critic_training_per_loop_iteration,
             n_actor_training_per_loop_iteration,
             exploration_config,
@@ -444,6 +449,7 @@ if __name__ == '__main__':
     n_expl_ep_per_it = 80
     n_nonexpl_ep_per_it = 80
     experiment_length_in_ep = 32000
+    n_actor_pretraining = 1000
     n_critic_training_per_loop_iteration = 400
     n_actor_training_per_loop_iteration = 100
     collection = "debug_collection"
@@ -492,6 +498,7 @@ if __name__ == '__main__':
         n_expl_ep_per_it,
         n_nonexpl_ep_per_it,
         experiment_length_in_ep,
+        n_actor_pretraining,
         n_critic_training_per_loop_iteration,
         n_actor_training_per_loop_iteration,
     )
