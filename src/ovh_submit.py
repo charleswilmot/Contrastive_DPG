@@ -105,10 +105,10 @@ def start_worker(ssh_client, host, db_name):
             "COPPELIASIM_MODEL_PATH": "/home/ubuntu/Code/Contrastive_DPG/3d_models/",
         }
     )
-    for line in stdout.readlines():
-        logger.info(f"start_worker (stdout):    {line.rstrip()}")
-    for line in stderr.readlines():
-        logger.info(f"start_worker (stderr):    {line.rstrip()}")
+    # for line in stdout.readlines():
+    #     logger.info(f"start_worker (stdout):    {line.rstrip()}")
+    # for line in stderr.readlines():
+    #     logger.info(f"start_worker (stderr):    {line.rstrip()}")
 
 
 if __name__ == '__main__':
