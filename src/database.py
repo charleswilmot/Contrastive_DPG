@@ -203,7 +203,7 @@ class Database:
         self._logger.info(f"[database] opening {host}")
         self.host = host
         self.conn = sql.connect(host=host, user=user, password=password)
-        self.cursor = self.conn.cursor(buffered=True)
+        self.cursor = self.conn.cursor()
 
         ########################################################################
         try: # USE the database 'db_name'
@@ -464,7 +464,7 @@ class Database:
         self.conn.commit()
 
     def get_hierarchization_config(self, hierarchization_config_id):
-        command = f'SELECT hierarchization_config FROM hierarchization_configs WHERE hierarchization_config_id={hierarchization_config_id}'
+        command = f'SELECT hierarchization_config FROM hierarchization_configs WHERE hierarchization_config_id={hierarchization_config_id} LIMIT 0, 1'
         self.cursor.execute(command)
         data = self.cursor.fetchone()[0]
         return pickle.loads(data)
@@ -479,7 +479,7 @@ class Database:
         return key
 
     def get_exploration_config(self, exploration_config_id):
-        command = f'SELECT * FROM exploration_configs WHERE exploration_config_id={exploration_config_id}'
+        command = f'SELECT * FROM exploration_configs WHERE exploration_config_id={exploration_config_id} LIMIT 0, 1'
         self.cursor.execute(command)
         args = self.cursor.fetchone()[1:]
         return ExplorationConfig(*args)
@@ -487,7 +487,7 @@ class Database:
     @contextmanager
     def get_a_job(self, path, hourly_pricing):
         with self.conn:
-            command = f'SELECT * FROM experiment_configs WHERE repetitions_remaining > 0'
+            command = f'SELECT * FROM experiment_configs WHERE repetitions_remaining > 0 LIMIT 0, 1'
             self.cursor.execute(command)
             res = self.cursor.fetchone() # tuple containing the data (one row)
             if res is None:
@@ -502,7 +502,7 @@ class Database:
                 repetitions_running,
                 repetitions_done,
             ) = res
-            command = f'SELECT * FROM mainloop_configs WHERE mainloop_config_id=%s'
+            command = f'SELECT * FROM mainloop_configs WHERE mainloop_config_id=%s LIMIT 0, 1'
             self.cursor.execute(command, (mainloop_config_id,))
             res = self.cursor.fetchone()
             (
@@ -518,7 +518,7 @@ class Database:
                 n_critic_training_per_loop_iteration,
                 n_actor_training_per_loop_iteration,
             ) = res
-            command = f'SELECT * FROM hyperparameters_configs WHERE hyperparameters_config_id=%s'
+            command = f'SELECT * FROM hyperparameters_configs WHERE hyperparameters_config_id=%s LIMIT 0, 1'
             self.cursor.execute(command, (hyperparameters_config_id,))
             res = self.cursor.fetchone()
             (
