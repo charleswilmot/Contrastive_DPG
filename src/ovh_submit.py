@@ -89,7 +89,10 @@ def populate_db(ssh_client, db_name, experiment_sets):
 
 
 def start_worker(ssh_client, host, db_name):
-    stdin, stdout, stderr = ssh_client.exec_command(
+    # https://stackoverflow.com/questions/17560498/running-process-of-remote-ssh-server-in-the-background-using-python-paramiko
+    transport = client.get_transport()
+    channel = transport.open_session()
+    channel.exec_command(
         f'''
         export COPPELIASIM_ROOT=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
         export LD_LIBRARY_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
