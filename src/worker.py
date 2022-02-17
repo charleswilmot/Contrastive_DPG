@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--password', default='', help='password for MySQL DB')
     parser.add_argument('--db-name', default='Contrastive_DQN_debug', help='name for MySQL DB')
     parser.add_argument('--log-path', default='../experiments/', help='path where experiments are logged')
+    parser.add_argument('--hourly-pricing', default=0.0889, help='hourly pricing of the OVH instance')
 
     args = parser.parse_args()
 
@@ -52,7 +53,7 @@ if __name__ == '__main__':
         logger.addHandler(file_handler)
 
 
-        with db.get_a_job(path) as args:
+        with db.get_a_job(path, hourly_pricing) as args:
             if args is not None:
                 agent = Agent(*args.agent)
                 with Experiment(*args.experiment, agent) as experiment:
