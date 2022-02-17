@@ -71,30 +71,44 @@ def wait_instance_ready(ssh_client):
     stdin, stdout, stderr = ssh_client.exec_command(
         "tail -f /var/log/cloud-init-output.log | sed '/Installation complete/ q'"
     )
-    logger.info(f"wait_instance_ready (stderr):\n{stderr.readlines()}")
-    logger.info(f"wait_instance_ready (stdout):\n{stdout.readlines()}")
+    for line in stderr.readlines():
+        logger.info(f"wait_instance_ready (stderr):    {line.rstrip()}")
 
 
 def populate_db(ssh_client, db_name, experiment_sets):
     stdin, stdout, stderr = ssh_client.exec_command(
         f'''
         cd Code/Contrastive_DPG/src/;
-        python3 register_experiments.py --user ubuntu --password aqwsedcft --db-name {db_name} {experiment_sets}
+        python3 register_experiments.py --user ubuntu --password aqwsedcft --db-name {db_name} {" ".join(experiment_sets)}
         '''
     )
-    logger.info(f"populate_db (stderr):\n{stderr.readlines()}")
-    logger.info(f"populate_db (stdout):\n{stdout.readlines()}")
+    for line in stdout.readlines():
+        logger.info(f"populate_db (stdout):    {line.rstrip()}")
+    for line in stderr.readlines():
+        logger.info(f"populate_db (stderr):    {line.rstrip()}")
 
 
 def start_worker(ssh_client, host, db_name):
     stdin, stdout, stderr = ssh_client.exec_command(
         f'''
+        export COPPELIASIM_ROOT=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
+        export LD_LIBRARY_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
+        export QT_QPA_PLATFORM_PLUGIN_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
+        export COPPELIASIM_MODEL_PATH=/home/ubuntu/Code/Contrastive_DPG/3d_models/
         cd Code/Contrastive_DPG/src/;
         python3 worker.py --user ubuntu --password aqwsedcft --db-name {db_name} --host {host}
-        '''
+        ''',
+        environment={
+            "COPPELIASIM_ROOT": "/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/",
+            "LD_LIBRARY_PATH": "/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/",
+            "QT_QPA_PLATFORM_PLUGIN_PATH": "/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/",
+            "COPPELIASIM_MODEL_PATH": "/home/ubuntu/Code/Contrastive_DPG/3d_models/",
+        }
     )
-    logger.info(f"start_worker (stderr):\n{stderr.readlines()}")
-    logger.info(f"start_worker (stdout):\n{stdout.readlines()}")
+    for line in stdout.readlines():
+        logger.info(f"start_worker (stdout):    {line.rstrip()}")
+    for line in stderr.readlines():
+        logger.info(f"start_worker (stderr):    {line.rstrip()}")
 
 
 if __name__ == '__main__':
