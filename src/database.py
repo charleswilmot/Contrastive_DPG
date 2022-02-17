@@ -203,7 +203,7 @@ class Database:
         self._logger.info(f"[database] opening {host}")
         self.host = host
         self.conn = sql.connect(host=host, user=user, password=password)
-        self.cursor = self.conn.cursor()
+        self.cursor = self.conn.cursor(buffered=True)
 
         ########################################################################
         try: # USE the database 'db_name'
