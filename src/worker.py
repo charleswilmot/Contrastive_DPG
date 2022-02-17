@@ -36,6 +36,7 @@ if __name__ == '__main__':
 
 
         log_path = args.log_path
+        os.makedirs(log_path, exist_ok=True)
         ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
         if ids:
             exp_id = 1 + max(ids)
@@ -43,7 +44,6 @@ if __name__ == '__main__':
             exp_id = 0
         run_name = f'{exp_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
         path = f'{log_path}/{run_name}'
-        os.makedirs(log_path, exist_ok=True)
         os.makedirs(path, exist_ok=True)
 
         file_handler = logging.FileHandler(f"{path}/output.log")
