@@ -481,80 +481,91 @@ class Database:
     def get_exploration_config(self, exploration_config_id):
         command = f'SELECT * FROM exploration_configs WHERE exploration_config_id={exploration_config_id} LIMIT 0, 1'
         self.cursor.execute(command)
-        args = self.cursor.fetchone()[1:]
-        return ExplorationConfig(*args)
+        (
+            type,
+            N,
+            interpolation_type,
+            upsilon_t0,
+            upsilon_tN,
+            exploration_prob_t0,
+            exploration_prob_tN,
+            softmax_temperature_t0,
+            softmax_temperature_tN,
+        ) = self.cursor.fetchone()[1:]
+        return ExplorationConfig(type, N, interpolation_type, float(upsilon_t0), float(upsilon_tN),
+            float(exploration_prob_t0), float(exploration_prob_tN), float(softmax_temperature_t0),
+            float(softmax_temperature_tN))
 
     @contextmanager
     def get_a_job(self, path, hourly_pricing):
-        with self.conn:
-            command = f'SELECT * FROM experiment_configs WHERE repetitions_remaining > 0 LIMIT 0, 1'
-            self.cursor.execute(command)
-            res = self.cursor.fetchone() # tuple containing the data (one row)
-            if res is None:
-                yield None
-                return
-            (
-                experiment_config_id,
-                mainloop_config_id,
-                hyperparameters_config_id,
-                repetitions_total,
-                repetitions_remaining,
-                repetitions_running,
-                repetitions_done,
-            ) = res
-            command = f'SELECT * FROM mainloop_configs WHERE mainloop_config_id=%s LIMIT 0, 1'
-            self.cursor.execute(command, (mainloop_config_id,))
-            res = self.cursor.fetchone()
-            (
-                mainloop_config_id,
-                restore_path,
-                n_sim,
-                episode_length,
-                lookback,
-                n_expl_ep_per_it,
-                n_nonexpl_ep_per_it,
-                experiment_length_in_ep,
-                n_actor_pretraining,
-                n_critic_training_per_loop_iteration,
-                n_actor_training_per_loop_iteration,
-            ) = res
-            command = f'SELECT * FROM hyperparameters_configs WHERE hyperparameters_config_id=%s LIMIT 0, 1'
-            self.cursor.execute(command, (hyperparameters_config_id,))
-            res = self.cursor.fetchone()
-            (
-                hyperparameters_config_id,
-                hierarchization_config_id,
-                exploration_config_id,
-                discount_factor,
-                noise_magnitude_limit,
-                hierarchization_coef,
-                actor_learning_rate,
-                critic_learning_rate,
-                batch_size,
-                smoothing,
-            ) = res
-            command = f'''UPDATE experiment_configs
-                          SET
-                            repetitions_remaining = repetitions_remaining - 1,
-                            repetitions_running = repetitions_running + 1
-                          WHERE
-                            experiment_config_id={experiment_config_id}
-                          '''
-            self.cursor.execute(command)
-            PRNGKey_start = self.get_PRNGKey_start(experiment_config_id)
-            experiment_id = self.insert_experiment(experiment_config_id, PRNGKey_start, datetime.now(), hourly_pricing, path)
-        hierarchization_config = self.get_hierarchization_config(hierarchization_config_id)
-        exploration_config = self.get_exploration_config(exploration_config_id)
-        agent_args = (
+        command = f'SELECT * FROM experiment_configs WHERE repetitions_remaining > 0 LIMIT 0, 1'
+        self.cursor.execute(command)
+        res = self.cursor.fetchone() # tuple containing the data (one row)
+        if res is None:
+            yield None
+            return
+        (
+            experiment_config_id,
+            mainloop_config_id,
+            hyperparameters_config_id,
+            repetitions_total,
+            repetitions_remaining,
+            repetitions_running,
+            repetitions_done,
+        ) = res
+        command = f'SELECT * FROM mainloop_configs WHERE mainloop_config_id=%s LIMIT 0, 1'
+        self.cursor.execute(command, (mainloop_config_id,))
+        res = self.cursor.fetchone()
+        (
+            mainloop_config_id,
+            restore_path,
+            n_sim,
+            episode_length,
+            lookback,
+            n_expl_ep_per_it,
+            n_nonexpl_ep_per_it,
+            experiment_length_in_ep,
+            n_actor_pretraining,
+            n_critic_training_per_loop_iteration,
+            n_actor_training_per_loop_iteration,
+        ) = res
+        command = f'SELECT * FROM hyperparameters_configs WHERE hyperparameters_config_id=%s LIMIT 0, 1'
+        self.cursor.execute(command, (hyperparameters_config_id,))
+        res = self.cursor.fetchone()
+        (
+            hyperparameters_config_id,
+            hierarchization_config_id,
+            exploration_config_id,
             discount_factor,
             noise_magnitude_limit,
-            hierarchization_config,
             hierarchization_coef,
             actor_learning_rate,
             critic_learning_rate,
+            batch_size,
+            smoothing,
+        ) = res
+        command = f'''UPDATE experiment_configs
+                      SET
+                        repetitions_remaining = repetitions_remaining - 1,
+                        repetitions_running = repetitions_running + 1
+                      WHERE
+                        experiment_config_id={experiment_config_id}
+                      '''
+        self.cursor.execute(command)
+        PRNGKey_start = self.get_PRNGKey_start(experiment_config_id)
+        experiment_id = self.insert_experiment(experiment_config_id, PRNGKey_start, datetime.now(), hourly_pricing, path)
+        hierarchization_config = self.get_hierarchization_config(hierarchization_config_id)
+        exploration_config = self.get_exploration_config(exploration_config_id)
+        agent_args = (
+            float(discount_factor),
+            float(noise_magnitude_limit),
+            hierarchization_config,
+            float(hierarchization_coef),
+            float(actor_learning_rate),
+            float(critic_learning_rate),
             ACTION_DIM,
         )
-        experiment_args = (n_sim, batch_size, smoothing, episode_length)
+        experiment_args = (n_sim, batch_size, float(smoothing), episode_length)
         mainloop_args = (
             PRNGKey_start,
             lookback,
