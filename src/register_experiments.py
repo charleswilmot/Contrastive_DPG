@@ -40,25 +40,31 @@ defaults = {
         "softmax_temperature_tN": 0.25,
     },
 
-    "experiment_config_args": {
-        "repetitions_total": 1,
+    "mainloop_config_args": {
         "restore_path": "",
         "n_sim": 20,
+        "episode_length": 100,
+        "lookback": 4,
+        "n_expl_ep_per_it": 120,
+        "n_nonexpl_ep_per_it": 40,
+        "experiment_length_in_ep":16000 ,
+        "n_actor_pretraining": 0,
+        "n_critic_training_per_loop_iteration": 400,
+        "n_actor_training_per_loop_iteration": 100,
+    },
+
+    "hyperparameters_config_args": {
         "discount_factor": 0.9,
         "noise_magnitude_limit": 0.5,
         "hierarchization_coef": 0.1,
         "actor_learning_rate": 2e-5,
         "critic_learning_rate": 1e-3,
         "batch_size": 4,
-        "episode_length": 100,
-        "lookback": 4,
         "smoothing": 0.0,
-        "n_expl_ep_per_it": 120,
-        "n_nonexpl_ep_per_it": 40,
-        "experiment_length_in_ep": 16000,
-        "n_actor_pretraining": 0,
-        "n_critic_training_per_loop_iteration": 400,
-        "n_actor_training_per_loop_iteration": 100,
+    },
+
+    "experiment_config_args": {
+        "repetitions_total": 1,
     },
 }
 
@@ -72,9 +78,19 @@ def insert_args(db, args, collections):
         **args["exploration_config_args"],
         protect=False,
     )
-    experiment_config_id = db.insert_experiment_config(
+    mainloop_config_id = db.insert_mainloop_config(
+        **args["mainloop_config_args"],
+        protect=False,
+    )
+    hyperparameters_config_id = db.insert_hyperparameters_config(
         hierarchization_config_id,
         exploration_config_id,
+        **args["hyperparameters_config_args"],
+        protect=False,
+    )
+    experiment_config_id = db.insert_experiment_config(
+        mainloop_config_id,
+        hyperparameters_config_id,
         **args["experiment_config_args"],
         protect=False,
     )
@@ -90,28 +106,28 @@ def insert_args(db, args, collections):
 def exp_2022_16_02_search_hierarchization_coef(db):
     args = deepcopy(defaults)
     for hierarchization_coef in [0.01, 0.1, 1.0, 10.0]:
-        args["experiment_config_args"]["hierarchization_coef"] = hierarchization_coef
+        args["hyperparameters_config_args"]["hierarchization_coef"] = hierarchization_coef
         insert_args(db, args, ["parameter_search", "search_hierarchization_coef"])
 
 
 def exp_2022_16_02_search_critic_training_per_loop(db):
     args = deepcopy(defaults)
     for n_critic_training_per_loop_iteration in [100, 200, 400, 800, 1600]:
-        args["experiment_config_args"]["n_critic_training_per_loop_iteration"] = n_critic_training_per_loop_iteration
+        args["mainloop_config_args"]["n_critic_training_per_loop_iteration"] = n_critic_training_per_loop_iteration
         insert_args(db, args, ["parameter_search", "search_critic_training_per_loop"])
 
 
 def exp_2022_16_02_search_batch_size(db):
     args = deepcopy(defaults)
     for batch_size in [2, 4, 8, 16]:
-        args["experiment_config_args"]["batch_size"] = batch_size
+        args["hyperparameters_config_args"]["batch_size"] = batch_size
         insert_args(db, args, ["parameter_search", "search_batch_size"])
 
 
 def exp_2022_16_02_search_lookback(db):
     args = deepcopy(defaults)
     for lookback in [2, 4, 8]:
-        args["experiment_config_args"]["lookback"] = lookback
+        args["mainloop_config_args"]["lookback"] = lookback
         insert_args(db, args, ["parameter_search", "search_lookback"])
 
 
@@ -124,8 +140,27 @@ experiment_sets = {
 
 
 if __name__ == '__main__':
+    import argparse
+    import logging
     import sys
 
-    db = Database(sys.argv[1])
-    for set_name in sys.argv[2:]:
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    parser = argparse.ArgumentParser(description='Populate database with experiments.')
+    parser.add_argument('--user', default='root', help='username for MySQL DB')
+    parser.add_argument('--password', default='', help='password for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DQN_debug', help='name for MySQL DB')
+    parser.add_argument('set_names', nargs='+', help='names of the sets of experiments to add to the DB')
+
+    args = parser.parse_args()
+
+    db = Database(db_name=args.db_name, user=args.user, password=args.password)
+    for set_name in args.set_names:
         experiment_sets[set_name](db)
+
+    # exp_2022_16_02_search_hierarchization_coef exp_2022_16_02_search_critic_training_per_loop exp_2022_16_02_search_batch_size exp_2022_16_02_search_lookback

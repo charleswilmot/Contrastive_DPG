@@ -1,5 +1,6 @@
 from datetime import datetime
-import sqlite3 as sql
+import mysql.connector as sql
+from mysql.connector import errorcode
 import pandas as pd
 import sys
 import logging
@@ -15,147 +16,224 @@ ACTION_DIM = 7
 Args = namedtuple("Args", ["agent", "experiment", "mainloop"])
 
 
-class Database:
-    def __init__(self, path):
-        self._logger = logging.getLogger("Database")
-        self._logger.info(f"[database] opening {path}")
-        self.path = path
-        self.conn = sql.connect(path, detect_types=sql.PARSE_DECLTYPES)
-        # self.conn.set_trace_callback(self._logger.debug)
-        self.cursor = self.conn.cursor()
-        command = 'PRAGMA foreign_keys = ON;'
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS exploration_configs (
-                     exploration_config_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     type TEXT NOT NULL,
-                     N INTEGER,
-                     interpolation_type TEXT,
-                     upsilon_t0 FLOAT,
-                     upsilon_tN FLOAT,
-                     exploration_prob_t0 FLOAT,
-                     exploration_prob_tN FLOAT,
-                     softmax_temperature_t0 FLOAT,
-                     softmax_temperature_tN FLOAT,
-                     CONSTRAINT UC_exploration_config UNIQUE (
-                        type,
-                        N,
-                        interpolation_type,
-                        upsilon_t0,
-                        upsilon_tN,
-                        exploration_prob_t0,
-                        exploration_prob_tN,
-                        softmax_temperature_t0,
-                        softmax_temperature_tN
-                    )
-                  );'''
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS hierarchization_configs (
-                     hierarchization_config_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     n_actors INTEGER NOT NULL,
-                     hierarchization_config VARBINARY(1024),
-                     CONSTRAINT UC_hierarchization_config UNIQUE (hierarchization_config)
-                  );'''
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS experiment_configs (
-                     experiment_config_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     hierarchization_config_id INTEGER NOT NULL,
-                     exploration_config_id INTEGER NOT NULL,
-                     repetitions_total INTEGER NOT NULL,
-                     repetitions_remaining INTEGER NOT NULL,
-                     repetitions_running INTEGER NOT NULL,
-                     repetitions_done INTEGER NOT NULL,
-                     restore_path TEXT,
-                     n_sim INTEGER NOT NULL,
-                     discount_factor FLOAT NOT NULL,
-                     noise_magnitude_limit FLOAT NOT NULL,
-                     hierarchization_coef FLOAT NOT NULL,
-                     actor_learning_rate FLOAT NOT NULL,
-                     critic_learning_rate FLOAT NOT NULL,
-                     batch_size INTEGER NOT NULL,
-                     episode_length INTEGER NOT NULL,
-                     lookback INTEGER NOT NULL,
-                     smoothing FLOAT NOT NULL,
-                     n_expl_ep_per_it INTEGER NOT NULL,
-                     n_nonexpl_ep_per_it INTEGER NOT NULL,
-                     experiment_length_in_ep INTEGER NOT NULL,
-                     n_actor_pretraining INTEGER NOT NULL,
-                     n_critic_training_per_loop_iteration INTEGER NOT NULL,
-                     n_actor_training_per_loop_iteration INTEGER NOT NULL,
+TABLES = {
+    "exploration_configs": '''
+        CREATE TABLE IF NOT EXISTS exploration_configs (
+            exploration_config_id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            type VARCHAR(255) NOT NULL,
+            N INTEGER,
+            interpolation_type VARCHAR(255),
+            upsilon_t0 DECIMAL(12,7),
+            upsilon_tN DECIMAL(12,7),
+            exploration_prob_t0 DECIMAL(12,7),
+            exploration_prob_tN DECIMAL(12,7),
+            softmax_temperature_t0 DECIMAL(12,7),
+            softmax_temperature_tN DECIMAL(12,7),
+            CONSTRAINT UC_exploration_config UNIQUE (
+                type,
+                N,
+                interpolation_type,
+                upsilon_t0,
+                upsilon_tN,
+                exploration_prob_t0,
+                exploration_prob_tN,
+                softmax_temperature_t0,
+                softmax_temperature_tN
+            )
+        );''',
 
-                     FOREIGN KEY (hierarchization_config_id)
-                        REFERENCES hierarchization_configs(hierarchization_config_id)
-                        ON DELETE CASCADE,
-                     FOREIGN KEY (exploration_config_id)
-                        REFERENCES exploration_configs(exploration_config_id)
-                        ON DELETE CASCADE,
-                     CONSTRAINT UC_experiment_config UNIQUE (
-                        restore_path,
-                        hierarchization_config_id,
-                        exploration_config_id,
-                        discount_factor,
-                        noise_magnitude_limit,
-                        hierarchization_coef,
-                        actor_learning_rate,
-                        critic_learning_rate,
-                        batch_size,
-                        episode_length,
-                        lookback,
-                        smoothing,
-                        n_expl_ep_per_it,
-                        n_nonexpl_ep_per_it,
-                        experiment_length_in_ep,
-                        n_actor_pretraining,
-                        n_critic_training_per_loop_iteration,
-                        n_actor_training_per_loop_iteration
-                     ),
-                     CONSTRAINT CC_divisible_n_sim CHECK (n_expl_ep_per_it % n_sim = 0 AND n_nonexpl_ep_per_it % n_sim = 0),
-                     CONSTRAINT CC_divisible_n_ep CHECK (experiment_length_in_ep % (n_expl_ep_per_it + n_nonexpl_ep_per_it) = 0)
-                  );'''
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS experiments (
-                     experiment_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     experiment_config_id INTEGER NOT NULL,
-                     PRNGKey_start INTEGER NOT NULL,
-                     date_time_start DATETIME NOT NULL,
-                     date_time_stop DATETIME,
-                     hourly_pricing FLOAT,
-                     path TEXT NOT NULL,
-                     finished INTEGER NOT NULL DEFAULT 0,
-                     FOREIGN KEY (experiment_config_id)
-                        REFERENCES experiment_configs(experiment_config_id)
-                        ON DELETE CASCADE
-                    CONSTRAINT UC_PRNGKey UNIQUE (experiment_config_id, PRNGKey_start)
-                  );'''
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS results (
-                     experiment_id INTEGER NOT NULL,
-                     loop_iteration INTEGER NOT NULL,
-                     episode_nb INTEGER NOT NULL,
-                     training_episode_return FLOAT,
-                     testing_episode_return FLOAT,
-                     exploration_param FLOAT NOT NULL,
-                     FOREIGN KEY (experiment_id)
-                        REFERENCES experiments(experiment_id)
-                        ON DELETE CASCADE
-                     CONSTRAINT UC_loop_iteration UNIQUE (experiment_id,loop_iteration),
-                     CONSTRAINT UC_episode_nb UNIQUE (experiment_id,episode_nb)
-                  );'''
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS collections (
-                     collection TEXT PRIMARY KEY
-                  );'''
-        self.cursor.execute(command)
-        command = '''CREATE TABLE IF NOT EXISTS collections_experiment_config (
-                     collection TEXT NOT NULL,
-                     experiment_config_id INTEGER NOT NULL,
-                     FOREIGN KEY (collection)
-                        REFERENCES collections(collection)
-                     FOREIGN KEY (experiment_config_id)
-                        REFERENCES experiment_configs(experiment_config_id)
-                        ON DELETE CASCADE
-                     UNIQUE (collection, experiment_config_id)
-                  );'''
-        self.cursor.execute(command)
+    "hierarchization_configs": '''
+        CREATE TABLE IF NOT EXISTS hierarchization_configs (
+            hierarchization_config_id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            n_actors INTEGER NOT NULL,
+            hierarchization_config VARBINARY(1024),
+            CONSTRAINT UC_hierarchization_config UNIQUE (hierarchization_config)
+        );''',
+
+    "mainloop_configs": '''
+        CREATE TABLE IF NOT EXISTS mainloop_configs (
+            mainloop_config_id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            restore_path VARCHAR(255),
+            n_sim INTEGER NOT NULL,
+            episode_length INTEGER NOT NULL,
+            lookback INTEGER NOT NULL,
+            n_expl_ep_per_it INTEGER NOT NULL,
+            n_nonexpl_ep_per_it INTEGER NOT NULL,
+            experiment_length_in_ep INTEGER NOT NULL,
+            n_actor_pretraining INTEGER NOT NULL,
+            n_critic_training_per_loop_iteration INTEGER NOT NULL,
+            n_actor_training_per_loop_iteration INTEGER NOT NULL,
+            CONSTRAINT UC_mainloop_config UNIQUE (
+                restore_path,
+                episode_length,
+                lookback,
+                n_expl_ep_per_it,
+                n_nonexpl_ep_per_it,
+                experiment_length_in_ep,
+                n_actor_pretraining,
+                n_critic_training_per_loop_iteration,
+                n_actor_training_per_loop_iteration
+            ),
+            CONSTRAINT CC_divisible_n_sim CHECK (
+                n_expl_ep_per_it % n_sim = 0 AND n_nonexpl_ep_per_it % n_sim = 0
+            ),
+            CONSTRAINT CC_divisible_n_ep CHECK (
+                experiment_length_in_ep % (n_expl_ep_per_it + n_nonexpl_ep_per_it) = 0
+            )
+        );''',
+
+    "hyperparameters_configs": '''
+        CREATE TABLE IF NOT EXISTS hyperparameters_configs (
+            hyperparameters_config_id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            hierarchization_config_id INTEGER NOT NULL,
+            exploration_config_id INTEGER NOT NULL,
+            discount_factor DECIMAL(12,7) NOT NULL,
+            noise_magnitude_limit DECIMAL(12,7) NOT NULL,
+            hierarchization_coef DECIMAL(12,7) NOT NULL,
+            actor_learning_rate DECIMAL(12,7) NOT NULL,
+            critic_learning_rate DECIMAL(12,7) NOT NULL,
+            batch_size INTEGER NOT NULL,
+            smoothing DECIMAL(12,7) NOT NULL,
+            CONSTRAINT UC_mainloop_config UNIQUE (
+                hierarchization_config_id,
+                exploration_config_id,
+                discount_factor,
+                noise_magnitude_limit,
+                hierarchization_coef,
+                actor_learning_rate,
+                critic_learning_rate,
+                batch_size,
+                smoothing
+            ),
+            FOREIGN KEY (hierarchization_config_id)
+                    REFERENCES hierarchization_configs(hierarchization_config_id)
+                    ON DELETE CASCADE,
+            FOREIGN KEY (exploration_config_id)
+                    REFERENCES exploration_configs(exploration_config_id)
+                    ON DELETE CASCADE
+        );''',
+
+    "experiment_configs": '''
+        CREATE TABLE IF NOT EXISTS experiment_configs (
+            experiment_config_id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            mainloop_config_id INTEGER NOT NULL,
+            hyperparameters_config_id INTEGER NOT NULL,
+            repetitions_total INTEGER NOT NULL,
+            repetitions_remaining INTEGER NOT NULL,
+            repetitions_running INTEGER NOT NULL,
+            repetitions_done INTEGER NOT NULL,
+
+            FOREIGN KEY (mainloop_config_id)
+                REFERENCES mainloop_configs(mainloop_config_id)
+                ON DELETE CASCADE,
+            FOREIGN KEY (hyperparameters_config_id)
+                REFERENCES hyperparameters_configs(hyperparameters_config_id)
+                ON DELETE CASCADE,
+            CONSTRAINT UC_experiment_config UNIQUE (
+                mainloop_config_id,
+                hyperparameters_config_id
+            )
+        );''',
+
+    "experiments": '''
+        CREATE TABLE IF NOT EXISTS experiments (
+            experiment_id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            experiment_config_id INTEGER NOT NULL,
+            PRNGKey_start INTEGER NOT NULL,
+            date_time_start DATETIME NOT NULL,
+            date_time_stop DATETIME,
+            hourly_pricing DECIMAL(12,7),
+            path VARCHAR(255) NOT NULL,
+            finished INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (experiment_config_id)
+                REFERENCES experiment_configs(experiment_config_id)
+                ON DELETE CASCADE,
+            CONSTRAINT UC_PRNGKey UNIQUE (
+                experiment_config_id,
+                PRNGKey_start
+            )
+        );''',
+
+    "results": '''
+        CREATE TABLE IF NOT EXISTS results (
+                experiment_id INTEGER NOT NULL,
+                loop_iteration INTEGER NOT NULL,
+                episode_nb INTEGER NOT NULL,
+                training_episode_return DECIMAL(12,7),
+                testing_episode_return DECIMAL(12,7),
+                exploration_param DECIMAL(12,7) NOT NULL,
+                FOREIGN KEY (experiment_id)
+                    REFERENCES experiments(experiment_id)
+                    ON DELETE CASCADE,
+                CONSTRAINT UC_loop_iteration UNIQUE (
+                    experiment_id,
+                    loop_iteration
+                ),
+                CONSTRAINT UC_episode_nb UNIQUE (
+                    experiment_id,
+                    episode_nb
+                )
+        );''',
+
+    "collections": '''
+        CREATE TABLE IF NOT EXISTS collections (
+            collection VARCHAR(255) PRIMARY KEY
+        );''',
+
+    "collections_experiment_config": '''
+        CREATE TABLE IF NOT EXISTS collections_experiment_config (
+            collection VARCHAR(255) NOT NULL,
+            experiment_config_id INTEGER NOT NULL,
+            FOREIGN KEY (collection)
+                REFERENCES collections(collection),
+            FOREIGN KEY (experiment_config_id)
+                REFERENCES experiment_configs(experiment_config_id)
+                ON DELETE CASCADE,
+            CONSTRAINT UC_collection_exp_config_id UNIQUE (
+                collection,
+                experiment_config_id
+            )
+        );'''
+}
+
+
+class Database:
+    def __init__(self, db_name, user='root', password='', host='127.0.0.1'):
+        self._logger = logging.getLogger("Database")
+        self._logger.info(f"[database] opening {host}")
+        self.host = host
+        self.conn = sql.connect(host=host, user=user, password=password)
+        self.cursor = self.conn.cursor()
+
+        ########################################################################
+        try: # USE the database 'db_name'
+            self.cursor.execute(f"USE {db_name}")
+        except sql.Error as err:
+            if err.errno == errorcode.ER_BAD_DB_ERROR:
+                self._logger.info(f"Database {db_name} does not exists. Creating it!")
+                try: # to create the database
+                    self.cursor.execute(f"CREATE DATABASE {db_name} DEFAULT CHARACTER SET 'utf8'")
+                except mysql.connector.Error as err:
+                    self._logger.critical(f"Failed creating database {db_name}: {err}")
+                self._logger.info(f"Database {db_name} created successfully.")
+                self.conn.database = db_name
+            else:
+                self._logger.critical(f"Unknown error when trying to 'USE {db_name}': {err}")
+                raise err
+        ########################################################################
+
+        for table_name, command in TABLES.items():
+            try:
+                self.cursor.execute(command)
+            except sql.Error as err:
+                if err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
+                    self._logger.info(f"Table {table_name} already exists.")
+                else:
+                    self._logger.critical(err.msg)
+                    raise err
+            else:
+                self._logger.info(f'Table {table_name} created')
+
 
     def add_to_collection(self, experiment_config_id, collection, protect=True):
         self.insert_into("collections", {
@@ -166,31 +244,16 @@ class Database:
             "experiment_config_id": experiment_config_id
         }, protect=protect)
 
-    def insert_experiment_config(self,
-            hierarchization_config_id, exploration_config_id, repetitions_total, restore_path, n_sim,
-            discount_factor, noise_magnitude_limit, hierarchization_coef,
-            actor_learning_rate, critic_learning_rate, batch_size,
-            episode_length, lookback, smoothing, n_expl_ep_per_it, n_nonexpl_ep_per_it,
-            experiment_length_in_ep, n_actor_pretraining, n_critic_training_per_loop_iteration,
+    def insert_mainloop_config(self,
+            restore_path, n_sim, episode_length, lookback, n_expl_ep_per_it,
+            n_nonexpl_ep_per_it, experiment_length_in_ep, n_actor_pretraining,
+            n_critic_training_per_loop_iteration,
             n_actor_training_per_loop_iteration, protect=True):
-        self.insert_into("experiment_configs", {
-            "hierarchization_config_id": hierarchization_config_id,
-            "exploration_config_id": exploration_config_id,
-            "repetitions_total": repetitions_total,
-            "repetitions_remaining": repetitions_total,
-            "repetitions_running": 0,
-            "repetitions_done": 0,
+        self.insert_into("mainloop_configs", {
             "restore_path": restore_path,
             "n_sim": n_sim,
-            "discount_factor": discount_factor,
-            "noise_magnitude_limit": noise_magnitude_limit,
-            "hierarchization_coef": hierarchization_coef,
-            "actor_learning_rate": actor_learning_rate,
-            "critic_learning_rate": critic_learning_rate,
-            "batch_size": batch_size,
             "episode_length": episode_length,
             "lookback": lookback,
-            "smoothing": smoothing,
             "n_expl_ep_per_it": n_expl_ep_per_it,
             "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
             "experiment_length_in_ep": experiment_length_in_ep,
@@ -198,8 +261,25 @@ class Database:
             "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
             "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
         }, protect=protect)
-        id = self.select_into("experiment_configs", ["experiment_config_id"], {
+        id = self.select_into("mainloop_configs", ["mainloop_config_id"], {
             "restore_path": restore_path,
+            "episode_length": episode_length,
+            "lookback": lookback,
+            "n_expl_ep_per_it": n_expl_ep_per_it,
+            "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
+            "experiment_length_in_ep": experiment_length_in_ep,
+            "n_actor_pretraining": n_actor_pretraining,
+            "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
+            "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
+        })[0][0]
+        self._logger.info(f"The new entry has id {id}")
+        return id
+
+    def insert_hyperparameters_config(self,
+            hierarchization_config_id, exploration_config_id, discount_factor,
+            noise_magnitude_limit, hierarchization_coef, actor_learning_rate,
+            critic_learning_rate, batch_size, smoothing, protect=True):
+        self.insert_into("hyperparameters_configs", {
             "hierarchization_config_id": hierarchization_config_id,
             "exploration_config_id": exploration_config_id,
             "discount_factor": discount_factor,
@@ -208,15 +288,36 @@ class Database:
             "actor_learning_rate": actor_learning_rate,
             "critic_learning_rate": critic_learning_rate,
             "batch_size": batch_size,
-            "episode_length": episode_length,
-            "lookback": lookback,
             "smoothing": smoothing,
-            "n_expl_ep_per_it": n_expl_ep_per_it,
-            "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
-            "experiment_length_in_ep": experiment_length_in_ep,
-            "n_actor_pretraining": n_actor_pretraining,
-            "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
-            "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
+        }, protect=protect)
+        id = self.select_into("hyperparameters_configs", ["hyperparameters_config_id"], {
+            "hierarchization_config_id": hierarchization_config_id,
+            "exploration_config_id": exploration_config_id,
+            "discount_factor": discount_factor,
+            "noise_magnitude_limit": noise_magnitude_limit,
+            "hierarchization_coef": hierarchization_coef,
+            "actor_learning_rate": actor_learning_rate,
+            "critic_learning_rate": critic_learning_rate,
+            "batch_size": batch_size,
+            "smoothing": smoothing,
+        })[0][0]
+        self._logger.info(f"The new entry has id {id}")
+        return id
+
+    def insert_experiment_config(self,
+            mainloop_config_id, hyperparameters_config_id, repetitions_total,
+            protect=True):
+        self.insert_into("experiment_configs", {
+            "mainloop_config_id": mainloop_config_id,
+            "hyperparameters_config_id": hyperparameters_config_id,
+            "repetitions_total": repetitions_total,
+            "repetitions_remaining": repetitions_total,
+            "repetitions_running": 0,
+            "repetitions_done": 0,
+        }, protect=protect)
+        id = self.select_into("experiment_configs", ["experiment_config_id"], {
+            "mainloop_config_id": mainloop_config_id,
+            "hyperparameters_config_id": hyperparameters_config_id,
         })[0][0]
         self._logger.info(f"The new entry has id {id}")
         return id
@@ -294,11 +395,11 @@ class Database:
         command = ""
         command += f"INSERT INTO {table_name}(\n    "
         command += ",\n    ".join(name_values_dict.keys())
-        command += f"\n) VALUES ({','.join(['?'] * len(name_values_dict))})"
+        command += f"\n) VALUES ({','.join([' %s'] * len(name_values_dict))})"
         try:
             self.cursor.execute(command, tuple(name_values_dict.values()))
-        except sql.IntegrityError as e:
-            if str(e).startswith("UNIQUE constraint failed"):
+        except sql.errors.IntegrityError as e:
+            if e.errno == errorcode.ER_DUP_ENTRY:
                 duplicate = True
                 if protect:
                     self._logger.critical(f"Trying to violate UNIQUE constraint ({table_name=})")
@@ -311,10 +412,17 @@ class Database:
         return duplicate
 
     def select_into(self, table_name, columns, name_values_dict):
+        tmp = []
+        for name, val in name_values_dict.items():
+            if val is None:
+                tmp.append(f"{name} IS NULL")
+            else:
+                tmp.append(f"{name}=%s")
+
         command = f"SELECT {','.join(columns)} FROM {table_name} WHERE (\n    "
-        command += ' AND\n    '.join([f"{name} IS ?" if val is None else f"{name}=?" for name, val in name_values_dict.items()])
+        command += ' AND\n    '.join(tmp)
         command += '\n)'
-        self.cursor.execute(command, tuple(name_values_dict.values()))
+        self.cursor.execute(command, tuple(x for x in name_values_dict.values() if x is not None))
         return self.cursor.fetchall()
 
     def get_dataframe(self, command):
@@ -377,7 +485,7 @@ class Database:
         return ExplorationConfig(*args)
 
     @contextmanager
-    def get_a_job(self, path):
+    def get_a_job(self, path, hourly_pricing):
         with self.conn:
             command = f'SELECT * FROM experiment_configs WHERE repetitions_remaining > 0'
             self.cursor.execute(command)
@@ -387,29 +495,43 @@ class Database:
                 return
             (
                 experiment_config_id,
-                hierarchization_config_id,
-                exploration_config_id,
+                mainloop_config_id,
+                hyperparameters_config_id,
                 repetitions_total,
                 repetitions_remaining,
                 repetitions_running,
                 repetitions_done,
+            ) = res
+            command = f'SELECT * FROM mainloop_configs WHERE mainloop_config_id=%s'
+            self.cursor.execute(command, (mainloop_config_id,))
+            res = self.cursor.fetchone()
+            (
+                mainloop_config_id,
                 restore_path,
                 n_sim,
-                discount_factor,
-                noise_magnitude_limit,
-                hierarchization_coef,
-                actor_learning_rate,
-                critic_learning_rate,
-                batch_size,
                 episode_length,
                 lookback,
-                smoothing,
                 n_expl_ep_per_it,
                 n_nonexpl_ep_per_it,
                 experiment_length_in_ep,
                 n_actor_pretraining,
                 n_critic_training_per_loop_iteration,
                 n_actor_training_per_loop_iteration,
+            ) = res
+            command = f'SELECT * FROM hyperparameters_configs WHERE hyperparameters_config_id=%s'
+            self.cursor.execute(command, (hyperparameters_config_id,))
+            res = self.cursor.fetchone()
+            (
+                hyperparameters_config_id,
+                hierarchization_config_id,
+                exploration_config_id,
+                discount_factor,
+                noise_magnitude_limit,
+                hierarchization_coef,
+                actor_learning_rate,
+                critic_learning_rate,
+                batch_size,
+                smoothing,
             ) = res
             command = f'''UPDATE experiment_configs
                           SET
@@ -420,7 +542,7 @@ class Database:
                           '''
             self.cursor.execute(command)
             PRNGKey_start = self.get_PRNGKey_start(experiment_config_id)
-            experiment_id = self.insert_experiment(experiment_config_id, PRNGKey_start, datetime.now(), 1.35, path)
+            experiment_id = self.insert_experiment(experiment_config_id, PRNGKey_start, datetime.now(), hourly_pricing, path)
         hierarchization_config = self.get_hierarchization_config(hierarchization_config_id)
         exploration_config = self.get_exploration_config(exploration_config_id)
         agent_args = (
@@ -430,7 +552,7 @@ class Database:
             hierarchization_coef,
             actor_learning_rate,
             critic_learning_rate,
-            ACTION_DIM
+            ACTION_DIM,
         )
         experiment_args = (n_sim, batch_size, smoothing, episode_length)
         mainloop_args = (
@@ -477,7 +599,14 @@ class Database:
 
 
 if __name__ == '__main__':
-    db = Database('/tmp/debug.db')
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    stream_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    db = Database(db_name=sys.argv[1], user=sys.argv[2], password=sys.argv[3])
 
     n_actors = 123
     hierarchization_config = [(1, 2, 3), (4, 5, 6)]
@@ -537,27 +666,35 @@ if __name__ == '__main__':
         softmax_temperature_tN,
     )
 
-    experiment_config_id = db.insert_experiment_config(
-        hierarchization_config_id,
-        exploration_config_id,
-        repetitions_total,
+    mainloop_config_id = db.insert_mainloop_config(
         restore_path,
         n_sim,
-        discount_factor,
-        noise_magnitude_limit,
-        hierarchization_coef,
-        actor_learning_rate,
-        critic_learning_rate,
-        batch_size,
         episode_length,
         lookback,
-        smoothing,
         n_expl_ep_per_it,
         n_nonexpl_ep_per_it,
         experiment_length_in_ep,
         n_actor_pretraining,
         n_critic_training_per_loop_iteration,
         n_actor_training_per_loop_iteration,
+    )
+
+    hyperparameters_config_id = db.insert_hyperparameters_config(
+        hierarchization_config_id,
+        exploration_config_id,
+        discount_factor,
+        noise_magnitude_limit,
+        hierarchization_coef,
+        actor_learning_rate,
+        critic_learning_rate,
+        batch_size,
+        smoothing,
+    )
+
+    experiment_config_id = db.insert_experiment_config(
+        mainloop_config_id,
+        hyperparameters_config_id,
+        repetitions_total,
     )
 
     db.add_to_collection(experiment_config_id, collection)
