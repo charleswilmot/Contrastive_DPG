@@ -585,27 +585,27 @@ class Database:
         try:
             yield Args(agent_args, experiment_args, mainloop_args)
         except:
-            with self.conn:
-                self._logger.critical(f"An exception has occured, deleting the experiment {experiment_id}")
-                self.delete_experiment(experiment_id)
-                self._logger.critical("An exception has occured, incrementing the 'remaining' counter")
-                command = f'''UPDATE experiment_configs
-                              SET
-                                repetitions_remaining = repetitions_remaining + 1
-                              WHERE
-                                experiment_config_id={experiment_config_id}
-                              '''
-                self.cursor.execute(command)
+            self._logger.critical(f"An exception has occured, deleting the experiment {experiment_id}")
+            self.delete_experiment(experiment_id)
+            self._logger.critical(f"An exception has occured, incrementing the 'remaining' counter ({experiment_config_id=})")
+            command = f'''UPDATE experiment_configs
+                          SET
+                            repetitions_remaining = repetitions_remaining + 1
+                          WHERE
+                            experiment_config_id={experiment_config_id}
+                          '''
+            self.cursor.execute(command)
+            self.conn.commit()
             raise
         finally:
-            with self.conn:
-                command = f'''UPDATE experiment_configs
-                              SET
-                                repetitions_running = repetitions_running - 1
-                              WHERE
-                                experiment_config_id={experiment_config_id}
-                              '''
-                self.cursor.execute(command)
+            command = f'''UPDATE experiment_configs
+                          SET
+                            repetitions_running = repetitions_running - 1
+                          WHERE
+                            experiment_config_id={experiment_config_id}
+                          '''
+            self.cursor.execute(command)
+            self.conn.commit()
         self.register_termination(experiment_id, datetime.now())
 
 
