@@ -384,9 +384,9 @@ class Database:
             "experiment_id": experiment_id,
             "loop_iteration": loop_iteration,
             "episode_nb": episode_nb,
-            "training_episode_return": training_episode_return,
-            "testing_episode_return": testing_episode_return,
-            "exploration_param": exploration_param,
+            "training_episode_return": float(training_episode_return),
+            "testing_episode_return": float(testing_episode_return),
+            "exploration_param": float(exploration_param),
         }, protect=protect)
 
     def insert_into(self, table_name, name_values_dict, protect=True):
