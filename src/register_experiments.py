@@ -131,11 +131,19 @@ def exp_2022_16_02_search_lookback(db):
         insert_args(db, args, ["parameter_search", "search_lookback"])
 
 
+def exp_2022_18_02_search_actor_training_per_loop(db):
+    args = deepcopy(defaults)
+    for n_actor_training_per_loop_iteration in [10, 50, 100, 200, 400]:
+        args["mainloop_config_args"]["n_actor_training_per_loop_iteration"] = n_actor_training_per_loop_iteration
+        insert_args(db, args, ["parameter_search", "search_actor_training_per_loop"])
+
+
 experiment_sets = {
     "exp_2022_16_02_search_hierarchization_coef": exp_2022_16_02_search_hierarchization_coef,
     "exp_2022_16_02_search_critic_training_per_loop": exp_2022_16_02_search_critic_training_per_loop,
     "exp_2022_16_02_search_batch_size": exp_2022_16_02_search_batch_size,
     "exp_2022_16_02_search_lookback": exp_2022_16_02_search_lookback,
+    "exp_2022_18_02_search_actor_training_per_loop": exp_2022_18_02_search_actor_training_per_loop,
 }
 
 
@@ -152,14 +160,15 @@ if __name__ == '__main__':
     logger.addHandler(stream_handler)
 
     parser = argparse.ArgumentParser(description='Populate database with experiments.')
-    parser.add_argument('--user', default='root', help='username for MySQL DB')
-    parser.add_argument('--password', default='', help='password for MySQL DB')
-    parser.add_argument('--db-name', default='Contrastive_DQN_debug', help='name for MySQL DB')
+    parser.add_argument('--user', default='ubuntu', help='username for MySQL DB')
+    parser.add_argument('--password', default='aqwsedcft', help='password for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG_debug', help='name for MySQL DB')
+    parser.add_argument('--host', default='127.0.0.1', help='IP for MySQL DB')
     parser.add_argument('set_names', nargs='+', help='names of the sets of experiments to add to the DB')
 
     args = parser.parse_args()
 
-    db = Database(db_name=args.db_name, user=args.user, password=args.password)
+    db = Database(db_name=args.db_name, user=args.user, password=args.password, host=args.host)
     for set_name in args.set_names:
         experiment_sets[set_name](db)
 
