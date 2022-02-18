@@ -54,7 +54,7 @@ if __name__ == '__main__':
         logger.addHandler(file_handler)
 
 
-        with db.get_a_job(path, job_args.hourly_pricing) as job_args:
+        with db.get_a_job(path, args.hourly_pricing) as job_args:
             if job_args is not None:
                 agent = Agent(*job_args.agent)
                 with Experiment(*job_args.experiment, agent) as experiment:
