@@ -428,6 +428,10 @@ class Database:
     def get_dataframe(self, command):
         return pd.read_sql(command, self.conn)
 
+    def get_data(self, command):
+        self.cursor.execute(command)
+        return self.cursor.fetchall()
+
     def get_experiment_config_ids(self, **kwargs):
         where = tuple(f"{key} IS NULL" if value is None else f"{key}='{value}'" for key, value in kwargs.items())
         where = ' AND\n            '.join(where)
