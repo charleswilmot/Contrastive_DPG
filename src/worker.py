@@ -30,13 +30,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     db = Database(db_name=args.db_name, user=args.user, password=args.password, host=args.host)
+    log_path = args.log_path
 
 
     done = False
     while not done:
 
 
-        log_path = args.log_path
         os.makedirs(log_path, exist_ok=True)
         ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
         if ids:
@@ -54,11 +54,11 @@ if __name__ == '__main__':
         logger.addHandler(file_handler)
 
 
-        with db.get_a_job(path, args.hourly_pricing) as args:
-            if args is not None:
-                agent = Agent(*args.agent)
-                with Experiment(*args.experiment, agent) as experiment:
-                    experiment.mainloop(*args.mainloop)
+        with db.get_a_job(path, job_args.hourly_pricing) as job_args:
+            if job_args is not None:
+                agent = Agent(*job_args.agent)
+                with Experiment(*job_args.experiment, agent) as experiment:
+                    experiment.mainloop(*job_args.mainloop)
             else:
                 done = True
 

@@ -481,7 +481,7 @@ class Experiment:
                     database.insert_result(
                         experiment_id,
                         loop_iteration=i,
-                        episode_nb=i * n_expl_ep_per_it,
+                        episode_nb=i * n_ep_per_it,
                         training_episode_return=training_return,
                         testing_episode_return=testing_return,
                         exploration_param=exploration.param,
