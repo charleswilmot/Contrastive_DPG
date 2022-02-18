@@ -26,15 +26,40 @@ def assert_no_instances_running(novac):
         raise RuntimeError("There are instances running")
 
 
-def create_instances(novac, n, image_name="Ubuntu 20.04", flavor_name="c2-7", wait=120):
-    assert_no_instances_running(novac)
-    if n < 1:
-        raise RuntimeError("Cannot start {n} instances")
+def get_names(novac, n, no_master):
+    instances = novac.servers.list()
+    names = [s.name for s in instances]
+    ret = []
+    if not no_master:
+        if 'master' in names:
+            raise RuntimeError("'master' instance already running, try with --no-master")
+        else:
+            ret.append('master')
+            n -= 1
+    found = 0
+    i = 0
+    while found < n:
+        name = f'worker{i}'
+        if name not in names:
+            found += 1
+            ret.append(name)
+        i += 1
+    return ret
+
+
+def get_master_instance(novac):
+    instances = novac.servers.list()
+    for instance in instances:
+        if instance.name == 'master':
+            return instance
+    raise RuntimeError("Could not find the 'master' instance")
+
+
+def create_instances(novac, names, image_name="Ubuntu 20.04", flavor_name="c2-7", wait=120):
     image = novac.glance.find_image(image_name)
     flavor = novac.flavors.find(name=flavor_name)
     net = novac.neutron.find_network(name="Ext-Net")
     keypair = novac.keypairs.find(name="SSHKEY")
-    names = ["master"] + [f"worker{i}" for i in range(n - 1)]
     instances = {}
 
     for name in names:
@@ -88,30 +113,31 @@ def populate_db(ssh_client, db_name, experiment_sets):
         logger.info(f"populate_db (stderr):    {line.rstrip()}")
 
 
-def start_worker(ssh_client, host, db_name):
+def start_worker(ssh_client, host, db_name, wait=0):
     # https://stackoverflow.com/questions/17560498/running-process-of-remote-ssh-server-in-the-background-using-python-paramiko
-    transport = client.get_transport()
-    channel = transport.open_session()
-    channel.exec_command(
+    # transport = ssh_client.get_transport()
+    # channel = transport.open_session()
+    # channel.exec_command(
+    #     f'''
+    #     export COPPELIASIM_ROOT=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
+    #     export LD_LIBRARY_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
+    #     export QT_QPA_PLATFORM_PLUGIN_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
+    #     export COPPELIASIM_MODEL_PATH=/home/ubuntu/Code/Contrastive_DPG/3d_models/
+    #     cd Code/Contrastive_DPG/src/
+    #     python3 worker.py --user ubuntu --password aqwsedcft --db-name {db_name} --host {host} &
+    #     '''
+    # )
+    time.sleep(wait)
+    stdin, stdout, stderr = ssh_client.exec_command(
         f'''
         export COPPELIASIM_ROOT=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
         export LD_LIBRARY_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
         export QT_QPA_PLATFORM_PLUGIN_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
         export COPPELIASIM_MODEL_PATH=/home/ubuntu/Code/Contrastive_DPG/3d_models/
-        cd Code/Contrastive_DPG/src/;
-        python3 worker.py --user ubuntu --password aqwsedcft --db-name {db_name} --host {host}
-        ''',
-        environment={
-            "COPPELIASIM_ROOT": "/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/",
-            "LD_LIBRARY_PATH": "/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/",
-            "QT_QPA_PLATFORM_PLUGIN_PATH": "/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/",
-            "COPPELIASIM_MODEL_PATH": "/home/ubuntu/Code/Contrastive_DPG/3d_models/",
-        }
+        cd Code/Contrastive_DPG/src/
+        python3 worker.py --user ubuntu --password aqwsedcft --db-name {db_name} --host {host} > /dev/null 2>&1 &
+        '''
     )
-    # for line in stdout.readlines():
-    #     logger.info(f"start_worker (stdout):    {line.rstrip()}")
-    # for line in stderr.readlines():
-    #     logger.info(f"start_worker (stderr):    {line.rstrip()}")
 
 
 if __name__ == '__main__':
@@ -119,8 +145,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Creates N workers on the OVH cloud.')
     parser.add_argument('--db-name', default='Contrastive_DQN_debug', help='name for MySQL DB')
+    parser.add_argument('--no-master', action='store_true', help='Number of workers to create')
     parser.add_argument('N', help='Number of workers to create', type=int)
-    parser.add_argument('set_names', nargs='+', help='names of the sets of experiments to add to the DB')
+    parser.add_argument('--set-names', nargs='+', help='names of the sets of experiments to add to the DB')
 
     args = parser.parse_args()
 
@@ -138,8 +165,9 @@ if __name__ == '__main__':
         region_name=os.environ['OS_REGION_NAME'],
     )
 
-    logger.info(f"Creating {args.N} instances")
-    instances = create_instances(novac, args.N, wait=120)
+    logger.info(f"Creating {args.N} instances {'(no master)' if args.no_master else ''}")
+    names = get_names(novac, args.N, args.no_master)
+    instances = create_instances(novac, names, wait=120)
 
     logger.info(f"Openning SSH connections")
     ssh_clients = {
@@ -151,10 +179,11 @@ if __name__ == '__main__':
         logger.info(f"Waiting on {name}")
         wait_instance_ready(ssh_client)
 
-    logger.info(f"Populating master's DB")
-    populate_db(ssh_clients["master"], args.db_name, args.set_names)
+    if not args.no_master:
+        logger.info(f"Populating master's DB")
+        populate_db(ssh_clients["master"], args.db_name, args.set_names)
 
-    host = instances["master"].addresses["Ext-Net"][0]["addr"]
-    for name, ssh_client in ssh_clients.items():
+    host = get_master_instance(novac).addresses["Ext-Net"][0]["addr"]
+    for n, (name, ssh_client) in enumerate(ssh_clients.items()):
         logger.info(f"Starting {name}")
-        start_worker(ssh_client, host, args.db_name)
+        start_worker(ssh_client, host, args.db_name, wait=(n * 5))
