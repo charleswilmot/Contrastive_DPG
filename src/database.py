@@ -601,6 +601,7 @@ class Database:
             command = f'''UPDATE experiment_configs
                           SET
                             repetitions_running = repetitions_running - 1
+                            repetitions_done = repetitions_done + 1
                           WHERE
                             experiment_config_id={experiment_config_id}
                           '''
