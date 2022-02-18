@@ -113,21 +113,7 @@ def populate_db(ssh_client, db_name, experiment_sets):
         logger.info(f"populate_db (stderr):    {line.rstrip()}")
 
 
-def start_worker(ssh_client, host, db_name, wait=0):
-    # https://stackoverflow.com/questions/17560498/running-process-of-remote-ssh-server-in-the-background-using-python-paramiko
-    # transport = ssh_client.get_transport()
-    # channel = transport.open_session()
-    # channel.exec_command(
-    #     f'''
-    #     export COPPELIASIM_ROOT=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
-    #     export LD_LIBRARY_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
-    #     export QT_QPA_PLATFORM_PLUGIN_PATH=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
-    #     export COPPELIASIM_MODEL_PATH=/home/ubuntu/Code/Contrastive_DPG/3d_models/
-    #     cd Code/Contrastive_DPG/src/
-    #     python3 worker.py --user ubuntu --password aqwsedcft --db-name {db_name} --host {host} &
-    #     '''
-    # )
-    time.sleep(wait)
+def start_worker(ssh_client, host, db_name):
     stdin, stdout, stderr = ssh_client.exec_command(
         f'''
         export COPPELIASIM_ROOT=/home/ubuntu/Softwares/CoppeliaSim_Edu_V4_3_0_Ubuntu20_04/
@@ -184,6 +170,7 @@ if __name__ == '__main__':
         populate_db(ssh_clients["master"], args.db_name, args.set_names)
 
     host = get_master_instance(novac).addresses["Ext-Net"][0]["addr"]
-    for n, (name, ssh_client) in enumerate(ssh_clients.items()):
+    for name, ssh_client in ssh_clients.items():
         logger.info(f"Starting {name}")
-        start_worker(ssh_client, host, args.db_name, wait=(n * 5))
+        start_worker(ssh_client, host, args.db_name)
+        time.sleep(2)
