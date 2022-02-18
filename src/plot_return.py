@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Populate database with experiments.')
     parser.add_argument('--user', default='root', help='username for MySQL DB')
     parser.add_argument('--password', default='', help='password for MySQL DB')
-    parser.add_argument('--db-name', default='Contrastive_DQN_debug', help='name for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG_debug', help='name for MySQL DB')
     parser.add_argument('--host', default='127.0.0.1', help='IP for MySQL DB')
     parser.add_argument('experiment_config_id', type=int, help='id of the experiment config to plot')
 
