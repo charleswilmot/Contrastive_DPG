@@ -138,12 +138,30 @@ def exp_2022_18_02_search_actor_training_per_loop(db):
         insert_args(db, args, ["parameter_search", "search_actor_training_per_loop"])
 
 
+def exp_2022_18_02_search_noise_magnitude_limit(db):
+    args = deepcopy(defaults)
+    for noise_magnitude_limit in [0.01, 0.25, 0.5, 1.0, 1.5, 2.0]:
+        args["hyperparameters_config_args"]["noise_magnitude_limit"] = noise_magnitude_limit
+        insert_args(db, args, ["parameter_search", "search_noise_magnitude_limit"])
+
+
+def exp_2022_18_02_search_expl_vs_nonexpl(db):
+    args = deepcopy(defaults)
+    for n_nonexpl_ep_per_it in [0, 40, 80, 100]:
+        n_expl_ep_per_it = 160 - n_nonexpl_ep_per_it
+        args["mainloop_config_args"]["n_nonexpl_ep_per_it"] = n_nonexpl_ep_per_it
+        args["mainloop_config_args"]["n_expl_ep_per_it"] = n_expl_ep_per_it
+        insert_args(db, args, ["parameter_search", "search_expl_vs_nonexpl"])
+
+
 experiment_sets = {
     "exp_2022_16_02_search_hierarchization_coef": exp_2022_16_02_search_hierarchization_coef,
     "exp_2022_16_02_search_critic_training_per_loop": exp_2022_16_02_search_critic_training_per_loop,
     "exp_2022_16_02_search_batch_size": exp_2022_16_02_search_batch_size,
     "exp_2022_16_02_search_lookback": exp_2022_16_02_search_lookback,
     "exp_2022_18_02_search_actor_training_per_loop": exp_2022_18_02_search_actor_training_per_loop,
+    "exp_2022_18_02_search_noise_magnitude_limit": exp_2022_18_02_search_noise_magnitude_limit,
+    "exp_2022_18_02_search_expl_vs_nonexpl": exp_2022_18_02_search_expl_vs_nonexpl,
 }
 
 
