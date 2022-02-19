@@ -44,11 +44,15 @@ def assert_no_instances_running(novac):
         raise RuntimeError("There are instances running")
 
 
-def assert_master_running(novac):
+def assert_instance_running(novac, instance_name):
     instances = novac.servers.list()
     names = [s.name for s in instances]
-    if 'master' not in names:
-        raise RuntimeError("Could not find the 'master' instance")
+    if instance_name not in names:
+        raise RuntimeError(f"Could not find the '{instance_name}' instance")
+
+
+def assert_master_running(novac):
+    assert_instance_running(novac, 'master')
 
 
 def get_missing_names(novac, n, no_master):
@@ -72,12 +76,16 @@ def get_missing_names(novac, n, no_master):
     return ret
 
 
-def get_master_instance(novac):
-    assert_master_running(novac)
+def get_instance_bay_name(novac, instance_name):
+    assert_instance_running(novac, instance_name)
     instances = novac.servers.list()
     for instance in instances:
-        if instance.name == 'master':
+        if instance.name == instance_name:
             return instance
+
+
+def get_master_instance(novac):
+    return get_instance_bay_name(novac, 'master')
 
 
 def create_instances(novac, names, image_name="Ubuntu 20.04", flavor_name="c2-7", wait=120):

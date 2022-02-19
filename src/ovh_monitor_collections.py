@@ -14,7 +14,7 @@ if __name__ == '__main__':
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-    parser = argparse.ArgumentParser(description='Populate database with experiments.')
+    parser = argparse.ArgumentParser(description='Monitor collections.')
     parser.add_argument('--user', default='ubuntu', help='username for MySQL DB')
     parser.add_argument('--password', default='aqwsedcft', help='password for MySQL DB')
     parser.add_argument('--db-name', default='Contrastive_DPG_debug', help='name for MySQL DB')
