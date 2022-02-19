@@ -102,7 +102,7 @@ improvement_1 = {
 
     "hyperparameters_config_args": {
         "discount_factor": 0.9,
-        "noise_magnitude_limit": 1.5, # changed
+        "noise_magnitude_limit": 2.0, # changed
         "hierarchization_coef": 0.01, # changed
         "actor_learning_rate": 2e-5,
         "critic_learning_rate": 1e-3,
