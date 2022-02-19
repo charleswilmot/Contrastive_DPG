@@ -164,6 +164,17 @@ def start_worker(ssh_client, host, db_name):
     )
 
 
+def is_worker_running(ssh_client):
+    stdin, stdout, stderr = ssh_client.exec_command('pgrep -f worker.py')
+    exit_status = stdout.channel.recv_exit_status()
+    return exit_status == 0
+
+
+def get_uptime(ssh_client):
+    stdin, stdout, stderr = ssh_client.exec_command('uptime -p')
+    return stdout.readline().rstrip()
+
+
 def scp_progress(filename, size, sent):
     logger.info(f'Downloading {filename}: received {int(100 * sent / size): 3d}% -- {sent: 9d}/{size: 9d}')
 
