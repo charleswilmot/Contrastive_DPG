@@ -454,11 +454,14 @@ class Experiment:
                         subkey,
                         exploration_config.no_exploration,
                     )
-                    testing_return = 0
+                    testing_return = np.mean(np.sum(testing_data["rewards"], axis=1))
 
                     start = (i % lookback) * n_ep_per_it + n_expl_ep_per_it
                     stop = start + n_nonexpl_ep_per_it
                     data_buffer[start:stop] = testing_data
+                else:
+                    testing_data = []
+                    testing_return = 0.0
 
                 # training critic
                 self.full_critic_training(

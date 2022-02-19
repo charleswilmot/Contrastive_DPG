@@ -328,7 +328,8 @@ class Agent:
         self._logger.info('logging to tensorboard')
 
         tensorboard.add_scalar('perf/training_return', jnp.mean(jnp.sum(training_data["rewards"], axis=-1)), iteration)
-        tensorboard.add_scalar('perf/testing_return', jnp.mean(jnp.sum(testing_data["rewards"], axis=-1)), iteration)
+        if len(testing_data):
+            tensorboard.add_scalar('perf/testing_return', jnp.mean(jnp.sum(testing_data["rewards"], axis=-1)), iteration)
 
         states = jnp.concatenate([training_data["states"], training_data["goals"]], axis=-1)
         actions = training_data["actions"]
