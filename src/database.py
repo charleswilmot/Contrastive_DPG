@@ -462,8 +462,10 @@ class Database:
         self.cursor.execute(command)
         self.conn.commit()
 
-    def register_termination(self, experiment_id, date_time_stop):
-        command = f"UPDATE experiments SET finished=1,date_time_stop='{date_time_stop}',repetitions_done = repetitions_done + 1 WHERE experiment_id={experiment_id}"
+    def register_termination(self, experiment_config_id, experiment_id, date_time_stop):
+        command = f"UPDATE experiments SET finished=1,date_time_stop='{date_time_stop}' WHERE experiment_id={experiment_id}"
+        self.cursor.execute(command)
+        command = f"UPDATE experiment_configs SET repetitions_done = repetitions_done + 1 WHERE experiment_config_id={experiment_config_id}"
         self.cursor.execute(command)
         self.conn.commit()
 
@@ -611,7 +613,7 @@ class Database:
                           '''
             self.cursor.execute(command)
             self.conn.commit()
-        self.register_termination(experiment_id, datetime.now())
+        self.register_termination(experiment_config_id, experiment_id, datetime.now())
 
 
 if __name__ == '__main__':

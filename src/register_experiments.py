@@ -18,8 +18,8 @@ hierarchization_config = (
     (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
     (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
 )
-# level=0 - dim=60 - d_min=2.54 - d_max=3.81 - slope_min=0.86 - slope_max=0.86
-# level=1 - dim=3 - d_min=0.6 - d_max=0.90 - slope_min=0.75 - slope_max=0.75
+# level=0 - dim=45 - d_min=2.54 - d_max=3.81 - slope_min=0.86 - slope_max=0.86
+# level=1 - dim=4 - d_min=0.6 - d_max=0.90 - slope_min=0.75 - slope_max=0.75
 
 
 defaults = {
@@ -57,6 +57,53 @@ defaults = {
         "discount_factor": 0.9,
         "noise_magnitude_limit": 0.5,
         "hierarchization_coef": 0.1,
+        "actor_learning_rate": 2e-5,
+        "critic_learning_rate": 1e-3,
+        "batch_size": 4,
+        "smoothing": 0.0,
+    },
+
+    "experiment_config_args": {
+        "repetitions_total": 1,
+    },
+}
+
+
+improvement_1 = {
+    "hierarchisation_args": {
+        "n_actors": 123,
+        "hierarchization_config": hierarchization_config,
+    },
+
+    "exploration_config_args": {
+        "type": "exploration_prob",
+        "N": 6000,
+        "interpolation_type": 'cosine',
+        "upsilon_t0": 0.2,
+        "upsilon_tN": 0.6,
+        "exploration_prob_t0": 0.9,
+        "exploration_prob_tN": 0.05,
+        "softmax_temperature_t0": 1.0,
+        "softmax_temperature_tN": 0.25,
+    },
+
+    "mainloop_config_args": {
+        "restore_path": "",
+        "n_sim": 20,
+        "episode_length": 100,
+        "lookback": 4,
+        "n_expl_ep_per_it": 120,
+        "n_nonexpl_ep_per_it": 40,
+        "experiment_length_in_ep":16000 ,
+        "n_actor_pretraining": 0,
+        "n_critic_training_per_loop_iteration": 800, # changed
+        "n_actor_training_per_loop_iteration": 100,
+    },
+
+    "hyperparameters_config_args": {
+        "discount_factor": 0.9,
+        "noise_magnitude_limit": 2.0, # changed
+        "hierarchization_coef": 0.01, # changed
         "actor_learning_rate": 2e-5,
         "critic_learning_rate": 1e-3,
         "batch_size": 4,
@@ -154,6 +201,31 @@ def exp_2022_18_02_search_expl_vs_nonexpl(db):
         insert_args(db, args, ["parameter_search", "search_expl_vs_nonexpl"])
 
 
+def exp_2022_19_02_search_critic_lr_and_n_training(db):
+    args = deepcopy(defaults)
+    for nc, bs, lr in [(200, 8, 1e-3), (200, 8, 5e-3), (200, 8, 25e-3), (400, 4, 1e-3), (400, 4, 5e-3), (400, 4, 25e-3)]:
+        args["mainloop_config_args"]["n_critic_training_per_loop_iteration"] = nc
+        args["hyperparameters_config_args"]["batch_size"] = bs
+        args["hyperparameters_config_args"]["critic_learning_rate"] = lr
+        insert_args(db, args, ["parameter_search", "search_critic_lr_and_n_training"])
+
+
+def exp_2022_19_02_search_actor_lr_and_n_training(db):
+    args = deepcopy(defaults)
+    for na, bs, lr in [(50, 8, 5e-6), (50, 8, 2e-5), (50, 8, 1e-4), (100, 8, 2e-5), (100, 8, 5e-6), (100, 4, 2e-5)]:
+        args["mainloop_config_args"]["n_actor_training_per_loop_iteration"] = na
+        args["hyperparameters_config_args"]["batch_size"] = bs
+        args["hyperparameters_config_args"]["actor_learning_rate"] = lr
+        insert_args(db, args, ["parameter_search", "search_actor_lr_and_n_training"])
+
+
+def exp_2022_19_02_search_discount_factor(db):
+    args = deepcopy(defaults)
+    for df in [0.7, 0.8, 0.9, 0.95]:
+        args["hyperparameters_config_args"]["discount_factor"] = df
+        insert_args(db, args, ["parameter_search", "search_discount_factor"])
+
+
 experiment_sets = {
     "exp_2022_16_02_search_hierarchization_coef": exp_2022_16_02_search_hierarchization_coef,
     "exp_2022_16_02_search_critic_training_per_loop": exp_2022_16_02_search_critic_training_per_loop,
@@ -162,6 +234,9 @@ experiment_sets = {
     "exp_2022_18_02_search_actor_training_per_loop": exp_2022_18_02_search_actor_training_per_loop,
     "exp_2022_18_02_search_noise_magnitude_limit": exp_2022_18_02_search_noise_magnitude_limit,
     "exp_2022_18_02_search_expl_vs_nonexpl": exp_2022_18_02_search_expl_vs_nonexpl,
+    "exp_2022_19_02_search_critic_lr_and_n_training": exp_2022_19_02_search_critic_lr_and_n_training,
+    "exp_2022_19_02_search_actor_lr_and_n_training": exp_2022_19_02_search_actor_lr_and_n_training,
+    "exp_2022_19_02_search_discount_factor": exp_2022_19_02_search_discount_factor,
 }
 
 

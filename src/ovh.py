@@ -75,13 +75,15 @@ def get_missing_names(novac, n, no_master):
         i += 1
     return ret
 
-
-def get_instance_bay_name(novac, instance_name):
+def get_instance_by_name(novac, instance_name):
     assert_instance_running(novac, instance_name)
     instances = novac.servers.list()
     for instance in instances:
         if instance.name == instance_name:
             return instance
+
+def get_master_instance(novac):
+    return get_instance_by_name(novac, 'master')
 
 
 def get_master_instance(novac):
@@ -164,6 +166,17 @@ def start_worker(ssh_client, host, db_name):
         python3 worker.py --user ubuntu --password aqwsedcft --db-name {db_name} --host {host} > /dev/null 2>&1 &
         '''
     )
+
+
+def is_worker_running(ssh_client):
+    stdin, stdout, stderr = ssh_client.exec_command('pgrep -f worker.py')
+    exit_status = stdout.channel.recv_exit_status()
+    return exit_status == 0
+
+
+def get_uptime(ssh_client):
+    stdin, stdout, stderr = ssh_client.exec_command('uptime -p')
+    return stdout.readline().rstrip()
 
 
 def scp_progress(filename, size, sent):
