@@ -517,6 +517,7 @@ class Database:
             repetitions_running,
             repetitions_done,
         ) = res
+        self._logger.info(f"get_a_job: {experiment_config_id=}")
         command = f'SELECT * FROM mainloop_configs WHERE mainloop_config_id=%s LIMIT 0, 1'
         self.cursor.execute(command, (mainloop_config_id,))
         res = self.cursor.fetchone()
