@@ -219,6 +219,13 @@ def exp_2022_19_02_search_actor_lr_and_n_training(db):
         insert_args(db, args, ["parameter_search", "search_actor_lr_and_n_training"])
 
 
+def exp_2022_19_02_search_discount_factor(db):
+    args = deepcopy(defaults)
+    for df in [0.7, 0.8, 0.9, 0.95]:
+        args["hyperparameters_config_args"]["discount_factor"] = df
+        insert_args(db, args, ["parameter_search", "search_discount_factor"])
+
+
 experiment_sets = {
     "exp_2022_16_02_search_hierarchization_coef": exp_2022_16_02_search_hierarchization_coef,
     "exp_2022_16_02_search_critic_training_per_loop": exp_2022_16_02_search_critic_training_per_loop,
@@ -229,6 +236,7 @@ experiment_sets = {
     "exp_2022_18_02_search_expl_vs_nonexpl": exp_2022_18_02_search_expl_vs_nonexpl,
     "exp_2022_19_02_search_critic_lr_and_n_training": exp_2022_19_02_search_critic_lr_and_n_training,
     "exp_2022_19_02_search_actor_lr_and_n_training": exp_2022_19_02_search_actor_lr_and_n_training,
+    "exp_2022_19_02_search_discount_factor": exp_2022_19_02_search_discount_factor,
 }
 
 
