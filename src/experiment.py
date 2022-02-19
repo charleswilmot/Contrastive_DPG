@@ -416,14 +416,15 @@ class Experiment:
             data_buffer[start:end] = data
 
             # collect initial non-exploratory data
-            data = self.collect_episode_data_multi(
-                n_nonexpl_data_collect * (lookback - 1),
-                subkey,
-                exploration_config.no_exploration,
-            )
-            start = end
-            end = start + n_nonexpl_ep_per_it * (lookback - 1)
-            data_buffer[start:end] = data
+            if n_nonexpl_ep_per_it != 0:
+                data = self.collect_episode_data_multi(
+                    n_nonexpl_data_collect * (lookback - 1),
+                    subkey,
+                    exploration_config.no_exploration,
+                )
+                start = end
+                end = start + n_nonexpl_ep_per_it * (lookback - 1)
+                data_buffer[start:end] = data
 
             self.full_actor_pretraining(data_buffer[n_ep_per_it:], n_actor_pretraining, subkey, tensorboard)
 
@@ -446,17 +447,18 @@ class Experiment:
                 data_buffer[start:stop] = training_data
 
                 # collect non-exploratory data
-                key, subkey = random.split(subkey)
-                testing_data = self.collect_episode_data_multi(
-                    n_nonexpl_data_collect,
-                    subkey,
-                    exploration_config.no_exploration,
-                )
-                testing_return = np.mean(np.sum(testing_data["rewards"], axis=1))
+                if n_nonexpl_ep_per_it != 0:
+                    key, subkey = random.split(subkey)
+                    testing_data = self.collect_episode_data_multi(
+                        n_nonexpl_data_collect,
+                        subkey,
+                        exploration_config.no_exploration,
+                    )
+                    testing_return = 0
 
-                start = (i % lookback) * n_ep_per_it + n_expl_ep_per_it
-                stop = start + n_nonexpl_ep_per_it
-                data_buffer[start:stop] = testing_data
+                    start = (i % lookback) * n_ep_per_it + n_expl_ep_per_it
+                    stop = start + n_nonexpl_ep_per_it
+                    data_buffer[start:stop] = testing_data
 
                 # training critic
                 self.full_critic_training(
