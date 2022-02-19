@@ -20,10 +20,6 @@ if __name__ == '__main__':
 
     for instance_name in args.instances:
         logger.info(f"restarting worker on {instance_name}")
-<<<<<<< HEAD
-        instance = get_instance_bay_name(novac, instance_name)
-=======
         instance = get_instance_by_name(novac, instance_name)
->>>>>>> dev
         ssh_client = get_ssh_client(instance)
         start_worker(ssh_client, args.host, args.db_name)
