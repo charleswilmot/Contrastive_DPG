@@ -463,7 +463,7 @@ class Database:
         self.conn.commit()
 
     def register_termination(self, experiment_id, date_time_stop):
-        command = f"UPDATE experiments SET finished=1,date_time_stop='{date_time_stop}' WHERE experiment_id={experiment_id}"
+        command = f"UPDATE experiments SET finished=1,date_time_stop='{date_time_stop}',repetitions_done = repetitions_done + 1 WHERE experiment_id={experiment_id}"
         self.cursor.execute(command)
         self.conn.commit()
 
@@ -605,8 +605,7 @@ class Database:
         finally:
             command = f'''UPDATE experiment_configs
                           SET
-                            repetitions_running = repetitions_running - 1,
-                            repetitions_done = repetitions_done + 1
+                            repetitions_running = repetitions_running - 1
                           WHERE
                             experiment_config_id={experiment_config_id}
                           '''
