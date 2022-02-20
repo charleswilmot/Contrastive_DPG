@@ -87,7 +87,7 @@ def get_master_instance(novac):
 
 
 def get_master_instance(novac):
-    return get_instance_bay_name(novac, 'master')
+    return get_instance_by_name(novac, 'master')
 
 
 def create_instances(novac, names, image_name="Ubuntu 20.04", flavor_name="c2-7", wait=120):

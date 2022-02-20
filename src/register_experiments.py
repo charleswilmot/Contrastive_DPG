@@ -92,8 +92,8 @@ improvement_1 = {
         "n_sim": 20,
         "episode_length": 100,
         "lookback": 4,
-        "n_expl_ep_per_it": 120,
-        "n_nonexpl_ep_per_it": 40,
+        "n_expl_ep_per_it": 160, # changed
+        "n_nonexpl_ep_per_it": 0, # changed
         "experiment_length_in_ep":16000 ,
         "n_actor_pretraining": 0,
         "n_critic_training_per_loop_iteration": 800, # changed
@@ -226,6 +226,17 @@ def exp_2022_19_02_search_discount_factor(db):
         insert_args(db, args, ["parameter_search", "search_discount_factor"])
 
 
+def exp_2022_20_02_search_shorter_loop(db):
+    args = deepcopy(improvement_1)
+    args["mainloop_config_args"]["n_nonexpl_ep_per_it"] = 0
+    for n_expl_ep_per_it in [20, 40, 80, 160]:
+        args["mainloop_config_args"]["n_expl_ep_per_it"] = n_expl_ep_per_it
+        args["mainloop_config_args"]["n_critic_training_per_loop_iteration"] = 5 * n_expl_ep_per_it
+        args["mainloop_config_args"]["n_actor_training_per_loop_iteration"] = int(n_expl_ep_per_it * 100 / 160)
+        args["mainloop_config_args"]["lookback"] = 4 * 160 // n_expl_ep_per_it
+        insert_args(db, args, ["parameter_search", "search_shorter_loop"])
+
+
 experiment_sets = {
     "exp_2022_16_02_search_hierarchization_coef": exp_2022_16_02_search_hierarchization_coef,
     "exp_2022_16_02_search_critic_training_per_loop": exp_2022_16_02_search_critic_training_per_loop,
@@ -237,6 +248,7 @@ experiment_sets = {
     "exp_2022_19_02_search_critic_lr_and_n_training": exp_2022_19_02_search_critic_lr_and_n_training,
     "exp_2022_19_02_search_actor_lr_and_n_training": exp_2022_19_02_search_actor_lr_and_n_training,
     "exp_2022_19_02_search_discount_factor": exp_2022_19_02_search_discount_factor,
+    "exp_2022_20_02_search_shorter_loop": exp_2022_20_02_search_shorter_loop,
 }
 
 
