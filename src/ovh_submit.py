@@ -5,12 +5,6 @@ if __name__ == '__main__':
     import logging
     import time
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    stream_handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
     logger = logging.getLogger("ovh_submit")
 
 
@@ -18,7 +12,6 @@ if __name__ == '__main__':
     parser.add_argument('--db-name', default='Contrastive_DPG', help='name for MySQL DB')
     parser.add_argument('--no-master', action='store_true', help='Number of workers to create')
     parser.add_argument('N', help='Number of workers to create', type=int)
-    parser.add_argument('--set-names', nargs='+', help='names of the sets of experiments to add to the DB')
     parser.add_argument('db_path', help='path to a DB file to upload on master')
 
     args = parser.parse_args()
@@ -37,13 +30,3 @@ if __name__ == '__main__':
         wait_instance_ready(ssh_client)
 
     upload_db(ssh_clients["master"], args.db_name, args.db_path)
-
-    # if not args.no_master:
-    #     logger.info(f"Populating master's DB")
-    #     populate_db(ssh_clients["master"], args.db_name, args.set_names)
-    #
-    # host = get_master_instance(novac).addresses["Ext-Net"][0]["addr"]
-    # for name, ssh_client in ssh_clients.items():
-    #     logger.info(f"Starting {name}")
-    #     start_worker(ssh_client, host, args.db_name)
-    #     time.sleep(2)
