@@ -183,6 +183,18 @@ def scp_progress(filename, size, sent):
     logger.info(f'Downloading {filename}: received {int(100 * sent / size): 3d}% -- {sent: 9d}/{size: 9d}')
 
 
+def upload_db(ssh_master, db_name, db_path):
+    scp = SCPClient(ssh_master.get_transport(), progress=scp_progress)
+    scp.put(db_path, f"/tmp/{db_name.sql}")
+    stdin, stdout, stderr = ssh_master.exec_command(f'''
+        mysql --user=ubuntu --password=aqwsedcft {db_name} < /tmp/{db_name}.sql
+    ''')
+    for line in stdout.readlines():
+        logger.info(f"upload_db (stdout):    {line.rstrip()}")
+    for line in stderr.readlines():
+        logger.info(f"upload_db (stderr):    {line.rstrip()}")
+
+
 def download_db(ssh_master, db_name, db_path):
     stdin, stdout, stderr = ssh_master.exec_command(f'''
         mysqldump --user=ubuntu --password=aqwsedcft {db_name} > /tmp/{db_name}.sql
