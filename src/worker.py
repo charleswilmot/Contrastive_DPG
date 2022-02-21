@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--host', default='127.0.0.1', help='MySQL DB IP address')
     parser.add_argument('--user', default='root', help='username for MySQL DB')
     parser.add_argument('--password', default='', help='password for MySQL DB')
-    parser.add_argument('--db-name', default='Contrastive_DPG_debug', help='name for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG', help='name for MySQL DB')
     parser.add_argument('--log-path', default='../experiments/', help='path where experiments are logged')
     parser.add_argument('--hourly-pricing', default=0.0889, help='hourly pricing of the OVH instance')
 

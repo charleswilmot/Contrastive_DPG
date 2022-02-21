@@ -15,12 +15,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--user1', default='ubuntu', help='username for MySQL DB')
     parser.add_argument('--password1', default='aqwsedcft', help='password for MySQL DB')
-    parser.add_argument('--db-name1', default='Contrastive_DPG_debug', help='name for MySQL DB')
+    parser.add_argument('--db-name1', default='Contrastive_DPG', help='name for MySQL DB')
     parser.add_argument('--host1', default='127.0.0.1', help='IP for MySQL DB')
 
     parser.add_argument('--user2', default='ubuntu', help='username for MySQL DB')
     parser.add_argument('--password2', default='aqwsedcft', help='password for MySQL DB')
-    parser.add_argument('--db-name2', default='Contrastive_DPG_debug', help='name for MySQL DB')
+    parser.add_argument('--db-name2', default='Contrastive_DPG', help='name for MySQL DB')
     parser.add_argument('--host2', default='127.0.0.1', help='IP for MySQL DB')
 
     args = parser.parse_args()

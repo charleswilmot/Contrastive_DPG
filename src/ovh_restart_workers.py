@@ -6,7 +6,7 @@ if __name__ == '__main__':
     logger = logging.getLogger("ovh/restart_workers")
 
     parser = argparse.ArgumentParser(description='Restart workers.')
-    parser.add_argument('--db-name', default='Contrastive_DPG_debug', help='name for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG', help='name for MySQL DB')
     parser.add_argument('--host', default='127.0.0.1', help='IP for MySQL DB')
     parser.add_argument('instances', nargs='+', help='list of instances names to restart the workers on')
 
