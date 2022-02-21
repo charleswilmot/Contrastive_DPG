@@ -24,7 +24,7 @@ hierarchization_config = (
 
 defaults = {
     "hierarchisation_args": {
-        "n_actors": 123,
+        "n_actors": 180,
         "hierarchization_config": hierarchization_config,
     },
 
@@ -71,7 +71,7 @@ defaults = {
 
 improvement_1 = {
     "hierarchisation_args": {
-        "n_actors": 123,
+        "n_actors": 180,
         "hierarchization_config": hierarchization_config,
     },
 
@@ -319,6 +319,129 @@ def exp_2022_20_02_search_better_hierarchization(db):
     insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
 
 
+def exp_2022_20_02_search_better_hierarchization_2(db):
+    args = deepcopy(improvement_1)
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 2
+    minmax_factor = 1.5
+    dmin2 = 0.6
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+    hierarchization_config = (
+        (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+    hierarchization_config = (
+        (20, dmin1, 100, 1 / k ** 1, 1 / k ** 1),
+        (9, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+    hierarchization_config = (
+        (30, dmin1, 100, 1 / k ** 1, 1 / k ** 1),
+        (6, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+    hierarchization_config = (
+        (36, dmin1, 100, 1 / k ** 1, 1 / k ** 1),
+        (5, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+    hierarchization_config = (
+        (45, dmin1, 100, 1 / k ** 1, 1 / k ** 1),
+        (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+    hierarchization_config = (
+        (60, dmin1, 100, 1 / k ** 1, 1 / k ** 1),
+        (3, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+    hierarchization_config = (
+        (90, dmin1, 100, 1 / k ** 1, 1 / k ** 1),
+        (2, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization_no_dmax1"])
+
+
+    for dmin2 in [0.2, 0.4, 0.6, 0.8]:
+        k = 1.15
+        SQRT2 = 1.41421356237
+        SAFETY = 2
+        minmax_factor = 1.5
+        dmax2 = dmin2 * minmax_factor
+        dmin1 = SAFETY * SQRT2 * (dmax2)
+        dmax1 = dmin1 * minmax_factor
+        dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+        dmax0 = dmin0 * minmax_factor
+
+        hierarchization_config = (
+            (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+            (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+        )
+        args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+        insert_args(db, args, ["parameter_search", "search_better_hierarchization_dmin2"])
+
+    for minmax_factor in [1.2, 1.5, 1.7]:
+        k = 1.15
+        SQRT2 = 1.41421356237
+        SAFETY = 2
+        dmin2 = 0.6
+        dmax2 = dmin2 * minmax_factor
+        dmin1 = SAFETY * SQRT2 * (dmax2)
+        dmax1 = dmin1 * minmax_factor
+        dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+        dmax0 = dmin0 * minmax_factor
+
+        hierarchization_config = (
+            (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+            (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+        )
+        args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+        insert_args(db, args, ["parameter_search", "search_better_hierarchization_minmax_factor"])
+
+
+    for SAFETY in [1.2, 1.5, 1.7, 2]:
+        k = 1.15
+        SQRT2 = 1.41421356237
+        minmax_factor = 1.5
+        dmin2 = 0.6
+        dmax2 = dmin2 * minmax_factor
+        dmin1 = SAFETY * SQRT2 * (dmax2)
+        dmax1 = dmin1 * minmax_factor
+        dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+        dmax0 = dmin0 * minmax_factor
+
+        hierarchization_config = (
+            (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+            (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+        )
+        args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+        insert_args(db, args, ["parameter_search", "search_better_hierarchization_safety"])
+
+
+
+
+
+
 
 
 experiment_sets = {
@@ -352,7 +475,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Populate database with experiments.')
     parser.add_argument('--user', default='ubuntu', help='username for MySQL DB')
     parser.add_argument('--password', default='aqwsedcft', help='password for MySQL DB')
-    parser.add_argument('--db-name', default='Contrastive_DPG_debug', help='name for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG', help='name for MySQL DB')
     parser.add_argument('--host', default='127.0.0.1', help='IP for MySQL DB')
     parser.add_argument('set_names', nargs='+', help='names of the sets of experiments to add to the DB')
 
