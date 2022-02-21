@@ -237,6 +237,90 @@ def exp_2022_20_02_search_shorter_loop(db):
         insert_args(db, args, ["parameter_search", "search_shorter_loop"])
 
 
+def exp_2022_20_02_search_better_hierarchization(db):
+    args = deepcopy(improvement_1)
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 2
+    minmax_factor = 1.5
+    dmin2 = 0.6
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+    hierarchization_config = (
+        (45, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+    hierarchization_config = (
+        (20, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (9, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+    hierarchization_config = (
+        (9, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (20, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+    hierarchization_config = (
+        (4, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (45, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 1.15
+    minmax_factor = 1.5
+    dmin2 = 0.4
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+
+    hierarchization_config = (
+        (5, dmin0, dmax0, 1 / k ** 1, 1 / k ** 0),
+        (6, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (6, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+
+    hierarchization_config = (
+        (4, dmin0, dmax0, 1 / k ** 1, 1 / k ** 0),
+        (5, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (9, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+
+    hierarchization_config = (
+        (9, dmin0, dmax0, 1 / k ** 1, 1 / k ** 0),
+        (5, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+        (4, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+    insert_args(db, args, ["parameter_search", "search_better_hierarchization"])
+
+
+
+
 experiment_sets = {
     "exp_2022_16_02_search_hierarchization_coef": exp_2022_16_02_search_hierarchization_coef,
     "exp_2022_16_02_search_critic_training_per_loop": exp_2022_16_02_search_critic_training_per_loop,
@@ -249,6 +333,7 @@ experiment_sets = {
     "exp_2022_19_02_search_actor_lr_and_n_training": exp_2022_19_02_search_actor_lr_and_n_training,
     "exp_2022_19_02_search_discount_factor": exp_2022_19_02_search_discount_factor,
     "exp_2022_20_02_search_shorter_loop": exp_2022_20_02_search_shorter_loop,
+    "exp_2022_20_02_search_better_hierarchization": exp_2022_20_02_search_better_hierarchization,
 }
 
 
