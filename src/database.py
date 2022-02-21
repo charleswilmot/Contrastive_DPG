@@ -371,7 +371,7 @@ class Database:
             return id
 
     def insert_experiment(self, experiment_config_id, PRNGKey_start, date_time_start,
-            hourly_pricing, path, date_time_stop=None, finished=None, protect=True):
+            hourly_pricing, path, date_time_stop=None, finished=0, protect=True):
         ids = self.select_into("experiments", ["experiment_id"], {
             "experiment_config_id": experiment_config_id,
             "PRNGKey_start": PRNGKey_start,
