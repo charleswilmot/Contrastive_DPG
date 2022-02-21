@@ -29,4 +29,5 @@ if __name__ == '__main__':
         logger.info(f"Waiting on {name}")
         wait_instance_ready(ssh_client)
 
-    upload_db(ssh_clients["master"], args.db_name, args.db_path)
+    if not args.no_master:
+        upload_db(ssh_clients["master"], args.db_name, args.db_path)

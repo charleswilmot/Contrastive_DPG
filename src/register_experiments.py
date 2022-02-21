@@ -457,6 +457,7 @@ experiment_sets = {
     "exp_2022_19_02_search_discount_factor": exp_2022_19_02_search_discount_factor,
     "exp_2022_20_02_search_shorter_loop": exp_2022_20_02_search_shorter_loop,
     "exp_2022_20_02_search_better_hierarchization": exp_2022_20_02_search_better_hierarchization,
+    "exp_2022_20_02_search_better_hierarchization_2": exp_2022_20_02_search_better_hierarchization_2,
 }
 
 
