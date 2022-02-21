@@ -236,9 +236,17 @@ class Database:
 
 
     def add_to_collection(self, experiment_config_id, collection, protect=True):
-        self.insert_into("collections", {
+        res = self.select_into("collections", ["collection"], {
             "collection": collection
-        }, protect=protect)
+        })
+        if len(res):
+            self._logger.info(f"collection {collection} already exists")
+            if protect:
+                raise RuntimeError("Trying to break UNIQUE constraint")
+        else:
+            self.insert_into("collections", {
+                "collection": collection
+            }, protect=protect)
         self.insert_into("collections_experiment_config", {
             "collection": collection,
             "experiment_config_id": experiment_config_id
@@ -249,19 +257,7 @@ class Database:
             n_nonexpl_ep_per_it, experiment_length_in_ep, n_actor_pretraining,
             n_critic_training_per_loop_iteration,
             n_actor_training_per_loop_iteration, protect=True):
-        self.insert_into("mainloop_configs", {
-            "restore_path": restore_path,
-            "n_sim": n_sim,
-            "episode_length": episode_length,
-            "lookback": lookback,
-            "n_expl_ep_per_it": n_expl_ep_per_it,
-            "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
-            "experiment_length_in_ep": experiment_length_in_ep,
-            "n_actor_pretraining": n_actor_pretraining,
-            "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
-            "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
-        }, protect=protect)
-        id = self.select_into("mainloop_configs", ["mainloop_config_id"], {
+        ids = self.select_into("mainloop_configs", ["mainloop_config_id"], {
             "restore_path": restore_path,
             "episode_length": episode_length,
             "lookback": lookback,
@@ -271,15 +267,42 @@ class Database:
             "n_actor_pretraining": n_actor_pretraining,
             "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
             "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
-        })[0][0]
-        self._logger.info(f"The new entry has id {id}")
-        return id
+        })
+        if len(ids):
+            self._logger.info(f"mainloop_config {ids[0][0]} already exists")
+            return ids[0][0]
+        else:
+            self.insert_into("mainloop_configs", {
+                "restore_path": restore_path,
+                "n_sim": n_sim,
+                "episode_length": episode_length,
+                "lookback": lookback,
+                "n_expl_ep_per_it": n_expl_ep_per_it,
+                "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
+                "experiment_length_in_ep": experiment_length_in_ep,
+                "n_actor_pretraining": n_actor_pretraining,
+                "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
+                "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
+            }, protect=protect)
+            id = self.select_into("mainloop_configs", ["mainloop_config_id"], {
+                "restore_path": restore_path,
+                "episode_length": episode_length,
+                "lookback": lookback,
+                "n_expl_ep_per_it": n_expl_ep_per_it,
+                "n_nonexpl_ep_per_it": n_nonexpl_ep_per_it,
+                "experiment_length_in_ep": experiment_length_in_ep,
+                "n_actor_pretraining": n_actor_pretraining,
+                "n_critic_training_per_loop_iteration": n_critic_training_per_loop_iteration,
+                "n_actor_training_per_loop_iteration": n_actor_training_per_loop_iteration,
+            })[0][0]
+            self._logger.info(f"The new entry has id {id}")
+            return id
 
     def insert_hyperparameters_config(self,
             hierarchization_config_id, exploration_config_id, discount_factor,
             noise_magnitude_limit, hierarchization_coef, actor_learning_rate,
             critic_learning_rate, batch_size, smoothing, protect=True):
-        self.insert_into("hyperparameters_configs", {
+        ids = self.select_into("hyperparameters_configs", ["hyperparameters_config_id"], {
             "hierarchization_config_id": hierarchization_config_id,
             "exploration_config_id": exploration_config_id,
             "discount_factor": discount_factor,
@@ -289,59 +312,94 @@ class Database:
             "critic_learning_rate": critic_learning_rate,
             "batch_size": batch_size,
             "smoothing": smoothing,
-        }, protect=protect)
-        id = self.select_into("hyperparameters_configs", ["hyperparameters_config_id"], {
-            "hierarchization_config_id": hierarchization_config_id,
-            "exploration_config_id": exploration_config_id,
-            "discount_factor": discount_factor,
-            "noise_magnitude_limit": noise_magnitude_limit,
-            "hierarchization_coef": hierarchization_coef,
-            "actor_learning_rate": actor_learning_rate,
-            "critic_learning_rate": critic_learning_rate,
-            "batch_size": batch_size,
-            "smoothing": smoothing,
-        })[0][0]
-        self._logger.info(f"The new entry has id {id}")
-        return id
+        })
+        if len(ids):
+            self._logger.info(f"hyperparameter_config {ids[0][0]} already exists")
+            return ids[0][0]
+        else:
+            self.insert_into("hyperparameters_configs", {
+                "hierarchization_config_id": hierarchization_config_id,
+                "exploration_config_id": exploration_config_id,
+                "discount_factor": discount_factor,
+                "noise_magnitude_limit": noise_magnitude_limit,
+                "hierarchization_coef": hierarchization_coef,
+                "actor_learning_rate": actor_learning_rate,
+                "critic_learning_rate": critic_learning_rate,
+                "batch_size": batch_size,
+                "smoothing": smoothing,
+            }, protect=protect)
+            id = self.select_into("hyperparameters_configs", ["hyperparameters_config_id"], {
+                "hierarchization_config_id": hierarchization_config_id,
+                "exploration_config_id": exploration_config_id,
+                "discount_factor": discount_factor,
+                "noise_magnitude_limit": noise_magnitude_limit,
+                "hierarchization_coef": hierarchization_coef,
+                "actor_learning_rate": actor_learning_rate,
+                "critic_learning_rate": critic_learning_rate,
+                "batch_size": batch_size,
+                "smoothing": smoothing,
+            })[0][0]
+            self._logger.info(f"The new entry has id {id}")
+            return id
 
     def insert_experiment_config(self,
             mainloop_config_id, hyperparameters_config_id, repetitions_total,
-            protect=True):
-        self.insert_into("experiment_configs", {
+            repetitions_remaining=None, repetitions_running=0, repetitions_done=0, protect=True):
+        if repetitions_remaining is None:
+            repetitions_remaining = repetitions_total
+        ids = self.select_into("experiment_configs", ["experiment_config_id"], {
             "mainloop_config_id": mainloop_config_id,
             "hyperparameters_config_id": hyperparameters_config_id,
-            "repetitions_total": repetitions_total,
-            "repetitions_remaining": repetitions_total,
-            "repetitions_running": 0,
-            "repetitions_done": 0,
-        }, protect=protect)
-        id = self.select_into("experiment_configs", ["experiment_config_id"], {
-            "mainloop_config_id": mainloop_config_id,
-            "hyperparameters_config_id": hyperparameters_config_id,
-        })[0][0]
-        self._logger.info(f"The new entry has id {id}")
-        return id
+        })
+        if len(ids):
+            self._logger.info(f"experiment_config {ids[0][0]} already exists")
+            return ids[0][0]
+        else:
+            self.insert_into("experiment_configs", {
+                "mainloop_config_id": mainloop_config_id,
+                "hyperparameters_config_id": hyperparameters_config_id,
+                "repetitions_total": repetitions_total,
+                "repetitions_remaining": repetitions_total,
+                "repetitions_running": 0,
+                "repetitions_done": 0,
+            }, protect=protect)
+            id = self.select_into("experiment_configs", ["experiment_config_id"], {
+                "mainloop_config_id": mainloop_config_id,
+                "hyperparameters_config_id": hyperparameters_config_id,
+            })[0][0]
+            self._logger.info(f"The new entry has id {id}")
+            return id
 
     def insert_experiment(self, experiment_config_id, PRNGKey_start, date_time_start,
-            hourly_pricing, path, protect=True):
-        self.insert_into("experiments", {
+            hourly_pricing, path, date_time_stop=None, finished=None, protect=True):
+        ids = self.select_into("experiments", ["experiment_id"], {
             "experiment_config_id": experiment_config_id,
             "PRNGKey_start": PRNGKey_start,
-            "date_time_start": date_time_start,
-            "hourly_pricing": hourly_pricing,
-            "path": path,
-        }, protect=protect)
-        id = self.select_into("experiments", ["experiment_id"], {
-            "experiment_config_id": experiment_config_id,
-            "PRNGKey_start": PRNGKey_start,
-        })[0][0]
-        self._logger.info(f"The new entry has id {id}")
-        return id
+        })
+        if len(ids):
+            self._logger.info(f"experiment {ids[0][0]} already exists")
+            return ids[0][0]
+        else:
+            self.insert_into("experiments", {
+                "experiment_config_id": experiment_config_id,
+                "PRNGKey_start": PRNGKey_start,
+                "date_time_start": date_time_start,
+                "date_time_stop": date_time_stop,
+                "hourly_pricing": hourly_pricing,
+                "path": path,
+                "finished": finished,
+            }, protect=protect)
+            id = self.select_into("experiments", ["experiment_id"], {
+                "experiment_config_id": experiment_config_id,
+                "PRNGKey_start": PRNGKey_start,
+            })[0][0]
+            self._logger.info(f"The new entry has id {id}")
+            return id
 
     def insert_exploration_config(self, type, N, interpolation_type, upsilon_t0,
             upsilon_tN, exploration_prob_t0, exploration_prob_tN,
             softmax_temperature_t0, softmax_temperature_tN, protect=True):
-        self.insert_into("exploration_configs", {
+        ids = self.select_into("exploration_configs", ["exploration_config_id"], {
             "type": type,
             "N": N,
             "interpolation_type": interpolation_type,
@@ -351,32 +409,56 @@ class Database:
             "exploration_prob_tN": exploration_prob_tN,
             "softmax_temperature_t0": softmax_temperature_t0,
             "softmax_temperature_tN": softmax_temperature_tN,
-        }, protect=protect)
-        id = self.select_into("exploration_configs", ["exploration_config_id"], {
-            "type": type,
-            "N": N,
-            "interpolation_type": interpolation_type,
-            "upsilon_t0": upsilon_t0,
-            "upsilon_tN": upsilon_tN,
-            "exploration_prob_t0": exploration_prob_t0,
-            "exploration_prob_tN": exploration_prob_tN,
-            "softmax_temperature_t0": softmax_temperature_t0,
-            "softmax_temperature_tN": softmax_temperature_tN,
-        })[0][0]
-        self._logger.info(f"The new entry has id {id}")
-        return id
+        })
+        if len(ids):
+            self._logger.info(f"exploration_config {ids[0][0]} already exists")
+            return ids[0][0]
+        else:
+            self.insert_into("exploration_configs", {
+                "type": type,
+                "N": N,
+                "interpolation_type": interpolation_type,
+                "upsilon_t0": upsilon_t0,
+                "upsilon_tN": upsilon_tN,
+                "exploration_prob_t0": exploration_prob_t0,
+                "exploration_prob_tN": exploration_prob_tN,
+                "softmax_temperature_t0": softmax_temperature_t0,
+                "softmax_temperature_tN": softmax_temperature_tN,
+            }, protect=protect)
+            id = self.select_into("exploration_configs", ["exploration_config_id"], {
+                "type": type,
+                "N": N,
+                "interpolation_type": interpolation_type,
+                "upsilon_t0": upsilon_t0,
+                "upsilon_tN": upsilon_tN,
+                "exploration_prob_t0": exploration_prob_t0,
+                "exploration_prob_tN": exploration_prob_tN,
+                "softmax_temperature_t0": softmax_temperature_t0,
+                "softmax_temperature_tN": softmax_temperature_tN,
+            })[0][0]
+            self._logger.info(f"The new entry has id {id}")
+            return id
 
     def insert_hierarchization_config(self, n_actors, hierarchization_config, protect=True):
-        self.insert_into("hierarchization_configs", {
+        dump = pickle.dumps(hierarchization_config)
+        ids = self.select_into("hierarchization_configs", ["hierarchization_config_id"], {
             "n_actors": n_actors,
-            "hierarchization_config": pickle.dumps(hierarchization_config),
-        }, protect=protect)
-        id = self.select_into("hierarchization_configs", ["hierarchization_config_id"], {
-            "n_actors": n_actors,
-            "hierarchization_config": pickle.dumps(hierarchization_config),
-        })[0][0]
-        self._logger.info(f"The new entry has id {id}")
-        return id
+            "hierarchization_config": dump,
+        })
+        if len(ids):
+            self._logger.info(f"hierarchization_config {ids[0][0]} already exists")
+            return ids[0][0]
+        else:
+            self.insert_into("hierarchization_configs", {
+                "n_actors": n_actors,
+                "hierarchization_config": dump,
+            }, protect=protect)
+            id = self.select_into("hierarchization_configs", ["hierarchization_config_id"], {
+                "n_actors": n_actors,
+                "hierarchization_config": dump,
+            })[0][0]
+            self._logger.info(f"The new entry has id {id}")
+            return id
 
     def insert_result(self, experiment_id, loop_iteration, episode_nb,
         training_episode_return, testing_episode_return, exploration_param, protect=True):
@@ -411,19 +493,218 @@ class Database:
         self.conn.commit()
         return duplicate
 
-    def select_into(self, table_name, columns, name_values_dict):
-        tmp = []
-        for name, val in name_values_dict.items():
-            if val is None:
-                tmp.append(f"{name} IS NULL")
-            else:
-                tmp.append(f"{name}=%s")
+    def select_into(self, table_name, columns, name_values_dict=None):
+        if name_values_dict is None:
+            command = f"SELECT {','.join(columns)} FROM {table_name}"
+            self.cursor.execute(command)
+            return self.cursor.fetchall()
+        else:
+            tmp = []
+            for name, val in name_values_dict.items():
+                if val is None:
+                    tmp.append(f"{name} IS NULL")
+                else:
+                    tmp.append(f"{name}=%s")
 
-        command = f"SELECT {','.join(columns)} FROM {table_name} WHERE (\n    "
-        command += ' AND\n    '.join(tmp)
-        command += '\n)'
-        self.cursor.execute(command, tuple(x for x in name_values_dict.values() if x is not None))
-        return self.cursor.fetchall()
+            command = f"SELECT {','.join(columns)} FROM {table_name}"
+            if name_values_dict is not None:
+                command += " WHERE (\n    "
+                command += ' AND\n    '.join(tmp)
+                command += '\n)'
+            self.cursor.execute(command, tuple(x for x in name_values_dict.values() if x is not None))
+            return self.cursor.fetchall()
+
+    def import_experiments(self, other_db, experiment_config_id, new_experiment_config_id):
+        other_experiments = other_db.select_into("experiments", [
+            "experiment_id",
+            "PRNGKey_start",
+            "date_time_start",
+            "date_time_stop",
+            "hourly_pricing",
+            "path",
+            "finished",
+        ], {"experiment_config_id": experiment_config_id})
+        for experiment in other_experiments:
+            (
+                experiment_id,
+                PRNGKey_start,
+                date_time_start,
+                date_time_stop,
+                hourly_pricing,
+                path,
+                finished,
+            ) = experiment
+            new_experiment_id = self.insert_experiment(
+                new_experiment_config_id,
+                PRNGKey_start,
+                date_time_start,
+                hourly_pricing,
+                path,
+                finished=finished,
+                date_time_stop=date_time_stop,
+                protect=False,
+            )
+            self.import_results(other_db, experiment_id, new_experiment_id)
+
+    def import_results(self, other_db, experiment_id, new_experiment_id):
+        other_results = other_db.select_into("results", [
+            "loop_iteration",
+            "episode_nb",
+            "training_episode_return",
+            "testing_episode_return",
+            "exploration_param"
+        ], {"experiment_id": experiment_id})
+        for args in other_results:
+            self.insert_result(new_experiment_id, *args, protect=False)
+
+    def import_mainloop_config(self, other_db, mainloop_config_id):
+        args = other_db.select_into("mainloop_configs", [
+            "restore_path",
+            "n_sim",
+            "episode_length",
+            "lookback",
+            "n_expl_ep_per_it",
+            "n_nonexpl_ep_per_it",
+            "experiment_length_in_ep",
+            "n_actor_pretraining",
+            "n_critic_training_per_loop_iteration",
+            "n_actor_training_per_loop_iteration",
+        ], {"mainloop_config_id": mainloop_config_id})[0]
+        return self.insert_mainloop_config(*args, protect=False)
+
+    def import_hyperparameter_config(self, other_db, hyperparameters_config_id):
+        (
+            hierarchization_config_id,
+            exploration_config_id,
+            discount_factor,
+            noise_magnitude_limit,
+            hierarchization_coef,
+            actor_learning_rate,
+            critic_learning_rate,
+            batch_size,
+            smoothing
+        ) = other_db.select_into("hyperparameters_configs", [
+            "hierarchization_config_id",
+            "exploration_config_id",
+            "discount_factor",
+            "noise_magnitude_limit",
+            "hierarchization_coef",
+            "actor_learning_rate",
+            "critic_learning_rate",
+            "batch_size",
+            "smoothing"
+        ], {"hyperparameters_config_id": hyperparameters_config_id})[0]
+        (
+            n_actors,
+        ) = other_db.select_into("hierarchization_configs", [
+            "n_actors",
+        ], {"hierarchization_config_id": hierarchization_config_id})[0]
+        hierarchization_config = other_db.get_hierarchization_config(hierarchization_config_id)
+        new_hierarchization_config_id = self.insert_hierarchization_config(
+            n_actors,
+            hierarchization_config,
+            protect=False,
+        )
+        (
+            type,
+            N,
+            interpolation_type,
+            upsilon_t0,
+            upsilon_tN,
+            exploration_prob_t0,
+            exploration_prob_tN,
+            softmax_temperature_t0,
+            softmax_temperature_tN,
+        ) = other_db.select_into("exploration_configs", [
+            "type",
+            "N",
+            "interpolation_type",
+            "upsilon_t0",
+            "upsilon_tN",
+            "exploration_prob_t0",
+            "exploration_prob_tN",
+            "softmax_temperature_t0",
+            "softmax_temperature_tN",
+        ], {"exploration_config_id": exploration_config_id})[0]
+        new_exploration_config_id = self.insert_exploration_config(
+            type,
+            N,
+            interpolation_type,
+            upsilon_t0,
+            upsilon_tN,
+            exploration_prob_t0,
+            exploration_prob_tN,
+            softmax_temperature_t0,
+            softmax_temperature_tN,
+            protect=False,
+        )
+        return self.insert_hyperparameters_config(
+            new_hierarchization_config_id,
+            new_exploration_config_id,
+            discount_factor,
+            noise_magnitude_limit,
+            hierarchization_coef,
+            actor_learning_rate,
+            critic_learning_rate,
+            batch_size,
+            smoothing,
+            protect=False
+        )
+
+    def import_collections(self, other_db, experiment_config_id, new_experiment_config_id):
+        command = f'''
+        SELECT
+            collections.collection
+        FROM
+            collections INNER JOIN collections_experiment_config
+            ON collections_experiment_config.collection = collections.collection
+        WHERE
+            collections_experiment_config.experiment_config_id={experiment_config_id}
+        '''
+        other_db.cursor.execute(command)
+        collections = other_db.cursor.fetchall()
+        collections = [c[0] for c in collections]
+        for collection in collections:
+            self.add_to_collection(new_experiment_config_id, collection, protect=False)
+
+    def import_experiment_config(self, other_db, experiment_config_id):
+        res = other_db.select_into("experiment_configs", [
+            "mainloop_config_id",
+            "hyperparameters_config_id",
+            "repetitions_total",
+            "repetitions_remaining",
+            "repetitions_running",
+            "repetitions_done",
+        ], {"experiment_config_id": experiment_config_id})
+        if len(res):
+            (
+                mainloop_config_id,
+                hyperparameters_config_id,
+                repetitions_total,
+                repetitions_remaining,
+                repetitions_running,
+                repetitions_done,
+            ) = res[0]
+            new_mainloop_config_id = self.import_mainloop_config(other_db, mainloop_config_id)
+            new_hyperparameters_config_id = self.import_hyperparameter_config(other_db, hyperparameters_config_id)
+            new_experiment_config_id = self.insert_experiment_config(
+                mainloop_config_id=new_mainloop_config_id,
+                hyperparameters_config_id=new_hyperparameters_config_id,
+                repetitions_total=repetitions_total,
+                repetitions_remaining=repetitions_remaining,
+                repetitions_running=repetitions_running,
+                repetitions_done=repetitions_done,
+                protect=False,
+            )
+            self.import_collections(other_db, experiment_config_id, new_experiment_config_id)
+            self.import_experiments(other_db, experiment_config_id, new_experiment_config_id)
+        else:
+            raise RuntimeError(f"Experiment with {experiment_config_id=} does not exist")
+
+    def import_experiment_configs(self, other_db):
+        other_experiment_config_ids = other_db.select_into("experiment_configs", ["experiment_config_id"])
+        for (experiment_config_id,) in other_experiment_config_ids:
+            self.import_experiment_config(other_db, experiment_config_id)
 
     def get_dataframe(self, command):
         return pd.read_sql(command, self.conn)
