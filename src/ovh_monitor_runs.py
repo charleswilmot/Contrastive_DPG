@@ -33,4 +33,4 @@ if __name__ == '__main__':
             results INNER JOIN experiments ON results.experiment_id = experiments.experiment_id
         GROUP BY
             experiments.experiment_id
-    '''))
+    ''')[-40:])

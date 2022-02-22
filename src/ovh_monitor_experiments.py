@@ -30,4 +30,4 @@ if __name__ == '__main__':
             repetitions_done
         FROM
             experiment_configs
-    '''))
+    ''')[-40:])

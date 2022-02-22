@@ -441,6 +441,42 @@ def exp_2022_20_02_search_better_hierarchization_2(db):
 
 
 
+def exp_2022_20_02_search_better_hierarchization_3(db):
+    args = deepcopy(improvement_1)
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 2
+    minmax_factor = 1.5
+    dmin2 = 0.6
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+    for level1_size in [20, 30, 40, 50, 60]:
+        hierarchization_config = (
+            (level1_size, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+            (5, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+        )
+        args["hierarchisation_args"]["n_actors"] = level1_size * 5
+        args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+        insert_args(db, args, ["parameter_search", "search_better_hierarchization_bigger_level1"])
+
+
+    for level2_size in [2, 3, 4, 5, 6]:
+        hierarchization_config = (
+            (50, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+            (level2_size, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+        )
+        args["hierarchisation_args"]["n_actors"] = level2_size * 50
+        args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+        insert_args(db, args, ["parameter_search", "search_better_hierarchization_bigger_level2"])
+
+
+
+
 
 
 
@@ -458,6 +494,7 @@ experiment_sets = {
     "exp_2022_20_02_search_shorter_loop": exp_2022_20_02_search_shorter_loop,
     "exp_2022_20_02_search_better_hierarchization": exp_2022_20_02_search_better_hierarchization,
     "exp_2022_20_02_search_better_hierarchization_2": exp_2022_20_02_search_better_hierarchization_2,
+    "exp_2022_20_02_search_better_hierarchization_3": exp_2022_20_02_search_better_hierarchization_3,
 }
 
 
