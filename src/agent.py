@@ -357,6 +357,9 @@ class Agent:
             acc["critic_loss"] += log["critic_loss"]
             acc["no_noise_critic_loss"] += log["no_noise_critic_loss"]
             acc["abs_actions"] += jnp.mean(jnp.sum(jnp.abs(log["recomputed_actions"]), axis=1), axis=(0, 1))
+            mean_actions = jnp.mean(log["recomputed_actions"], axis=2, keepdims=True) # shape [N_ACTORS, BATCH, 1, ACTION_DIM]
+            dist_to_mean = jnp.sqrt(jnp.sum((mean_actions - log["recomputed_actions"]) ** 2, axis=-1)) # shape [N_ACTORS, BATCH, SEQUENCE]
+            acc["actions_variability"] += jnp.mean(dist_to_mean)
             acc["mean_closest_1"] += log["mean_closest_1"]
             acc["mean_closest_5"] += log["mean_closest_5"]
             acc["mean_closest_10"] += log["mean_closest_10"]
@@ -481,6 +484,7 @@ class Agent:
         tensorboard.add_scalar('noise/closest_5', acc["mean_closest_5"] / len(slices), iteration)
         tensorboard.add_scalar('noise/closest_10', acc["mean_closest_10"] / len(slices), iteration)
         tensorboard.add_scalar('noise/closest_20', acc["mean_closest_20"] / len(slices), iteration)
+        tensorboard.add_scalar('noise/actions_variability', acc["actions_variability"] / len(slices), iteration)
 
         tensorboard.add_scalar('perf/estimated_return_t0', acc["best_recomputed_returns_t0"] / N, iteration)
         tensorboard.add_scalar('perf/estimated_return_mean', acc["best_recomputed_returns"] / N, iteration)
