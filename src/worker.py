@@ -38,7 +38,7 @@ if __name__ == '__main__':
     while not done:
 
 
-        with db.get_a_job(path, args.hourly_pricing) as (experiment_config_id, experiment_id, job_args):
+        with db.get_a_job(log_path, args.hourly_pricing) as (experiment_config_id, experiment_id, job_args):
             if job_args is not None:
 
                 ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
