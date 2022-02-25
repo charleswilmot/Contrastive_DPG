@@ -293,6 +293,9 @@ class Agent:
         no_noise_target_returns = batched(rewards, discounts, returns)
         no_noise_critic_loss = jnp.mean(rlax.l2_loss(returns[..., :-1], no_noise_target_returns))
 
+        # get the hierechization loss
+        h_loss = get_hierarchization_loss(recomputed_actions, self._hierarchization_config)
+
         sorted_distances = jnp.sort(sample_action_distance_matrix, axis=0)
         mean_closest_1 = jnp.mean(sorted_distances[1:2])
         mean_closest_5 = jnp.mean(sorted_distances[1:6])
@@ -316,6 +319,7 @@ class Agent:
         log["mean_closest_5"] = mean_closest_5
         log["mean_closest_10"] = mean_closest_10
         log["mean_closest_20"] = mean_closest_20
+        log["h_loss"] = h_loss
         return log
 
     # @partial(jax.jit, static_argnums=(0, 6))
@@ -364,6 +368,7 @@ class Agent:
             acc["mean_closest_5"] += log["mean_closest_5"]
             acc["mean_closest_10"] += log["mean_closest_10"]
             acc["mean_closest_20"] += log["mean_closest_20"]
+            acc["h_loss"] += log["h_loss"]
 
 
 
@@ -484,6 +489,7 @@ class Agent:
         tensorboard.add_scalar('noise/closest_5', acc["mean_closest_5"] / len(slices), iteration)
         tensorboard.add_scalar('noise/closest_10', acc["mean_closest_10"] / len(slices), iteration)
         tensorboard.add_scalar('noise/closest_20', acc["mean_closest_20"] / len(slices), iteration)
+        tensorboard.add_scalar('noise/h_loss', acc["h_loss"] / len(slices), iteration)
         tensorboard.add_scalar('noise/actions_variability', acc["actions_variability"] / len(slices), iteration)
 
         tensorboard.add_scalar('perf/estimated_return_t0', acc["best_recomputed_returns_t0"] / N, iteration)
