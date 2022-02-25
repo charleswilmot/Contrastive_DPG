@@ -690,6 +690,26 @@ def exp_2022_24_02_search_actor_params(db):
 
 
 
+def exp_2022_25_02_search_low_hierarchization_coef(db):
+    args = deepcopy(improvement_3)
+
+    args["mainloop_config_args"]["experiment_length_in_ep"] = 6080
+    args["mainloop_config_args"]["n_actor_training_per_loop_iteration"] = 100
+
+    args["hyperparameters_config_args"]["actor_learning_rate"] = 4e-5
+
+    for hierarchization_coef in [0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1]:
+        args["hyperparameters_config_args"]["hierarchization_coef"] = hierarchization_coef
+        insert_args(db, args, [f"search_low_hierarchization_coef_alr_4e-5"])
+
+    args["hyperparameters_config_args"]["actor_learning_rate"] = 4e-4
+
+    for hierarchization_coef in [0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1]:
+        args["hyperparameters_config_args"]["hierarchization_coef"] = hierarchization_coef
+        insert_args(db, args, [f"search_low_hierarchization_coef_alr_4e-4"])
+
+
+
 
 
 
@@ -713,6 +733,7 @@ experiment_sets = {
     "exp_2022_24_02_search_exploration_2": exp_2022_24_02_search_exploration_2,
     "exp_2022_24_02_search_exploration_3": exp_2022_24_02_search_exploration_3,
     "exp_2022_24_02_search_actor_params": exp_2022_24_02_search_actor_params,
+    "exp_2022_25_02_search_low_hierarchization_coef": exp_2022_25_02_search_low_hierarchization_coef,
 }
 
 
