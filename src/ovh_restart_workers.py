@@ -2,6 +2,7 @@ if __name__ == '__main__':
     import argparse
     import logging
     from ovh import *
+    import time
 
     logger = logging.getLogger("ovh/restart_workers")
 
@@ -23,3 +24,4 @@ if __name__ == '__main__':
         instance = get_instance_by_name(novac, instance_name)
         ssh_client = get_ssh_client(instance)
         start_worker(ssh_client, args.host, args.db_name)
+        time.sleep(2)

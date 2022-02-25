@@ -115,6 +115,106 @@ improvement_1 = {
     },
 }
 
+hierarchization_config = (
+    (50, 0.6, 100, 1 / 1.15 ** 2, 1 / 1.15 ** 2),
+)
+
+improvement_2 = {
+    "hierarchisation_args": {
+        "n_actors": 50,
+        "hierarchization_config": hierarchization_config,
+    },
+
+    "exploration_config_args": {
+        "type": "exploration_prob",
+        "N": 3000,
+        "interpolation_type": 'cosine',
+        "upsilon_t0": 0.2,
+        "upsilon_tN": 0.6,
+        "exploration_prob_t0": 0.6,
+        "exploration_prob_tN": 0.05,
+        "softmax_temperature_t0": 1.0,
+        "softmax_temperature_tN": 0.25,
+    },
+
+    "mainloop_config_args": {
+        "restore_path": "",
+        "n_sim": 20,
+        "episode_length": 100,
+        "lookback": 4,
+        "n_expl_ep_per_it": 160, # changed
+        "n_nonexpl_ep_per_it": 0, # changed
+        "experiment_length_in_ep":16000 ,
+        "n_actor_pretraining": 0,
+        "n_critic_training_per_loop_iteration": 800, # changed
+        "n_actor_training_per_loop_iteration": 100,
+    },
+
+    "hyperparameters_config_args": {
+        "discount_factor": 0.9,
+        "noise_magnitude_limit": 2.0, # changed
+        "hierarchization_coef": 0.01, # changed
+        "actor_learning_rate": 2e-5,
+        "critic_learning_rate": 1e-3,
+        "batch_size": 4,
+        "smoothing": 0.0,
+    },
+
+    "experiment_config_args": {
+        "repetitions_total": 1,
+    },
+}
+
+
+hierarchization_config = (
+    (50, 0.6, 100, 1 / 1.15 ** 2, 1 / 1.15 ** 2),
+)
+improvement_3 = {
+    "hierarchisation_args": {
+        "n_actors": 50,
+        "hierarchization_config": hierarchization_config,
+    },
+
+    "exploration_config_args": {
+        "type": "exploration_prob",
+        "N": 3000,
+        "interpolation_type": 'cosine',
+        "upsilon_t0": 0.2,
+        "upsilon_tN": 0.6,
+        "exploration_prob_t0": 0.6,
+        "exploration_prob_tN": 0.05,
+        "softmax_temperature_t0": 1.0,
+        "softmax_temperature_tN": 0.25,
+    },
+
+    "mainloop_config_args": {
+        "restore_path": "",
+        "n_sim": 20,
+        "episode_length": 100,
+        "lookback": 4,
+        "n_expl_ep_per_it": 160, # changed
+        "n_nonexpl_ep_per_it": 0, # changed
+        "experiment_length_in_ep":16000 ,
+        "n_actor_pretraining": 0,
+        "n_critic_training_per_loop_iteration": 800, # changed
+        "n_actor_training_per_loop_iteration": 50,
+    },
+
+    "hyperparameters_config_args": {
+        "discount_factor": 0.9,
+        "noise_magnitude_limit": 2.0, # changed
+        "hierarchization_coef": 0.0001, # changed
+        "actor_learning_rate": 1e-4,
+        "critic_learning_rate": 1e-3,
+        "batch_size": 4,
+        "smoothing": 0.0,
+    },
+
+    "experiment_config_args": {
+        "repetitions_total": 1,
+    },
+}
+
 
 def insert_args(db, args, collections):
     hierarchization_config_id = db.insert_hierarchization_config(
@@ -476,6 +576,119 @@ def exp_2022_20_02_search_better_hierarchization_3(db):
 
 
 
+def exp_2022_23_02_search_better_hierarchization_4(db):
+    args = deepcopy(improvement_1)
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 2
+    minmax_factor = 1.5
+    dmin2 = 0.6
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+    for level1_size in [20, 50]:
+        for level2_size in [2, 3, 4, 5, 6]:
+            hierarchization_config = (
+                (level1_size, dmin1, dmax1, 1 / k ** 1, 1 / k ** 1),
+                (level2_size, dmin2, dmax2, 1 / k ** 2, 1 / k ** 2),
+            )
+            args["hierarchisation_args"]["n_actors"] = level2_size * level1_size
+            args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+            insert_args(db, args, ["parameter_search", "search_better_hierarchization_bigger_level1_and_2"])
+
+    for size in [50, 100, 200]:
+        hierarchization_config = (
+            (size, dmin2, 100, 1 / k ** 2, 1 / k ** 2),
+        )
+        args["hierarchisation_args"]["n_actors"] = size
+        args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+        insert_args(db, args, ["parameter_search", "search_better_hierarchization_flat"])
+
+
+
+def exp_2022_23_02_search_exploration(db):
+    args = deepcopy(improvement_1)
+
+    k = 1.15
+    SQRT2 = 1.41421356237
+    SAFETY = 2
+    minmax_factor = 1.5
+    dmin2 = 0.6
+    dmax2 = dmin2 * minmax_factor
+    dmin1 = SAFETY * SQRT2 * (dmax2)
+    dmax1 = dmin1 * minmax_factor
+    dmin0 = SAFETY * SQRT2 * (dmax1 + dmax2)
+    dmax0 = dmin0 * minmax_factor
+
+    hierarchization_config = (
+        (50, dmin2, 50, 1 / k ** 2, 1 / k ** 2),
+    )
+    args["hierarchisation_args"]["n_actors"] = 50
+    args["hierarchisation_args"]["hierarchization_config"] = hierarchization_config
+
+    for N in [500, 1000, 2000, 3000, 4000, 6000]:
+        args["exploration_config_args"]["type"] = "exploration_prob"
+        args["exploration_config_args"]["N"] = N
+        args["exploration_config_args"]["exploration_prob_t0"] = 0.9
+        args["exploration_config_args"]["exploration_prob_tN"] = 0.05
+        insert_args(db, args, ["parameter_search", "search_exploration_prob_N"])
+
+    for exploration_prob_t0 in [0.2, 0.6, 0.9]:
+        args["exploration_config_args"]["type"] = "exploration_prob"
+        args["exploration_config_args"]["N"] = 6000
+        args["exploration_config_args"]["exploration_prob_t0"] = exploration_prob_t0
+        args["exploration_config_args"]["exploration_prob_tN"] = 0.05
+        insert_args(db, args, ["parameter_search", "search_exploration_prob_t0"])
+
+
+
+def exp_2022_24_02_search_exploration_2(db):
+    args = deepcopy(improvement_2)
+
+    for exploration_prob_tN in [0.01, 0.05, 0.1, 0.2]:
+        args["exploration_config_args"]["type"] = "exploration_prob"
+        args["exploration_config_args"]["exploration_prob_tN"] = exploration_prob_tN
+        insert_args(db, args, ["parameter_search", "search_exploration_prob_tN"])
+
+
+def exp_2022_24_02_search_exploration_3(db):
+    args = deepcopy(improvement_2)
+
+    softmax_ratio = 4
+
+    for softmax_temperature_t0 in [1.0, 0.5, 0.35, 0.25, 0.125, 0.09, 0.07]:
+        args["exploration_config_args"]["type"] = "softmax_temperature"
+        args["exploration_config_args"]["softmax_temperature_t0"] = softmax_temperature_t0
+        args["exploration_config_args"]["softmax_temperature_tN"] = softmax_temperature_t0 / softmax_ratio
+        insert_args(db, args, ["parameter_search", "search_softmax_temperature"])
+
+    softmax_ratio = 2
+
+    for softmax_temperature_t0 in [0.125, 0.09, 0.07, 0.06, 0.05]:
+        args["exploration_config_args"]["type"] = "softmax_temperature"
+        args["exploration_config_args"]["softmax_temperature_t0"] = softmax_temperature_t0
+        args["exploration_config_args"]["softmax_temperature_tN"] = softmax_temperature_t0 / softmax_ratio
+        insert_args(db, args, ["parameter_search", "search_softmax_temperature_2"])
+
+
+
+
+def exp_2022_24_02_search_actor_params(db):
+    args = deepcopy(improvement_3)
+
+    args["mainloop_config_args"]["experiment_length_in_ep"] = 6080
+
+    for actor_learning_rate_coef in [1, 4, 10, 20, 50, 100]:
+        args["hyperparameters_config_args"]["actor_learning_rate"] = 1e-5 * actor_learning_rate_coef
+        for n_actor_training_per_loop_iteration in [25, 50, 100, 200, 400]:
+            args["mainloop_config_args"]["n_actor_training_per_loop_iteration"] = n_actor_training_per_loop_iteration
+            insert_args(db, args, [f"search_actor_params_{n_actor_training_per_loop_iteration}"])
+
+
 
 
 
@@ -495,6 +708,11 @@ experiment_sets = {
     "exp_2022_20_02_search_better_hierarchization": exp_2022_20_02_search_better_hierarchization,
     "exp_2022_20_02_search_better_hierarchization_2": exp_2022_20_02_search_better_hierarchization_2,
     "exp_2022_20_02_search_better_hierarchization_3": exp_2022_20_02_search_better_hierarchization_3,
+    "exp_2022_23_02_search_better_hierarchization_4": exp_2022_23_02_search_better_hierarchization_4,
+    "exp_2022_23_02_search_exploration": exp_2022_23_02_search_exploration,
+    "exp_2022_24_02_search_exploration_2": exp_2022_24_02_search_exploration_2,
+    "exp_2022_24_02_search_exploration_3": exp_2022_24_02_search_exploration_3,
+    "exp_2022_24_02_search_actor_params": exp_2022_24_02_search_actor_params,
 }
 
 
