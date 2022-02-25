@@ -789,7 +789,7 @@ class Database:
         self.cursor.execute(command)
         res = self.cursor.fetchone() # tuple containing the data (one row)
         if res is None:
-            yield None
+            yield None, None, None
             return
         (
             experiment_config_id,
@@ -871,7 +871,7 @@ class Database:
             experiment_id,
         )
         try:
-            yield Args(agent_args, experiment_args, mainloop_args)
+            yield experiment_config_id, experiment_id, Args(agent_args, experiment_args, mainloop_args)
         except:
             self._logger.critical(f"An exception has occured, deleting the experiment {experiment_id}")
             self.delete_experiment(experiment_id)

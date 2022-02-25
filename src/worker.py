@@ -31,31 +31,34 @@ if __name__ == '__main__':
 
     db = Database(db_name=args.db_name, user=args.user, password=args.password, host=args.host)
     log_path = args.log_path
+    os.makedirs(log_path, exist_ok=True)
 
 
     done = False
     while not done:
 
 
-        os.makedirs(log_path, exist_ok=True)
-        ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
-        if ids:
-            exp_id = 1 + max(ids)
-        else:
-            exp_id = 0
-        run_name = f'{exp_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
-        path = f'{log_path}/{run_name}'
-        os.makedirs(path, exist_ok=True)
-
-        file_handler = logging.FileHandler(f"{path}/output.log")
-        sys.stderr = open(f"{path}/error.log", "a")
-        formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-
-        with db.get_a_job(path, args.hourly_pricing) as job_args:
+        with db.get_a_job(path, args.hourly_pricing) as (experiment_config_id, experiment_id, job_args):
             if job_args is not None:
+
+                ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
+                if ids:
+                    exp_id = 1 + max(ids)
+                else:
+                    exp_id = 0
+
+                run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_eid_{experiment_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
+                path = f'{log_path}/{run_name}'
+                os.makedirs(path, exist_ok=True)
+
+                file_handler = logging.FileHandler(f"{path}/output.log")
+                sys.stderr = open(f"{path}/error.log", "a")
+                formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+
+
+
                 agent = Agent(*job_args.agent)
                 with Experiment(*job_args.experiment, agent) as experiment:
                     experiment.mainloop(*job_args.mainloop)
