@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Monitor collections.')
     parser.add_argument('--user', default='ubuntu', help='username for MySQL DB')
     parser.add_argument('--password', default='aqwsedcft', help='password for MySQL DB')
-    parser.add_argument('--db-name', default='Contrastive_DPG', help='name for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG_v2', help='name for MySQL DB')
     parser.add_argument('--finished-only', action='store_true', help='show finished experiments only')
     parser.add_argument('--host', default='127.0.0.1', help='IP for MySQL DB')
 

@@ -6,7 +6,7 @@ if __name__ == '__main__':
     logger = logging.getLogger("ovh/download_db")
 
     parser = argparse.ArgumentParser(description='Creates N workers on the OVH cloud.')
-    parser.add_argument('--db-name', default='Contrastive_DPG', help='name for MySQL DB')
+    parser.add_argument('--db-name', default='Contrastive_DPG_v2', help='name for MySQL DB')
     parser.add_argument('--db-path', default='../databases/', help='Path to database backup files')
 
     args = parser.parse_args()
