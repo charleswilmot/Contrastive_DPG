@@ -24,40 +24,28 @@ if __name__ == '__main__':
     parser.add_argument('--user', default='root', help='username for MySQL DB')
     parser.add_argument('--password', default='', help='password for MySQL DB')
     parser.add_argument('--db-name', default='Contrastive_DPG_v2', help='name for MySQL DB')
-    parser.add_argument('--log-path', default='../experiments/', help='path where experiments are logged')
     parser.add_argument('--hourly-pricing', default=0.0889, help='hourly pricing of the OVH instance')
 
     args = parser.parse_args()
 
     db = Database(db_name=args.db_name, user=args.user, password=args.password, host=args.host)
-    log_path = args.log_path
-    os.makedirs(log_path, exist_ok=True)
+    os.makedirs("../experiments/", exist_ok=True)
 
 
     done = False
     while not done:
 
 
-        with db.get_a_job(log_path, args.hourly_pricing) as (experiment_config_id, experiment_id, job_args):
+        with db.get_a_job(args.hourly_pricing) as (job_path, job_args):
             if job_args is not None:
 
-                ids = [int(match.group(1)) for x in os.listdir(log_path) if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
-                if ids:
-                    exp_id = 1 + max(ids)
-                else:
-                    exp_id = 0
+                os.makedirs(job_path, exist_ok=True)
 
-                run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_eid_{experiment_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
-                path = f'{log_path}/{run_name}'
-                os.makedirs(path, exist_ok=True)
-
-                file_handler = logging.FileHandler(f"{path}/output.log")
-                sys.stderr = open(f"{path}/error.log", "a")
+                file_handler = logging.FileHandler(f"{job_path}/output.log")
+                sys.stderr = open(f"{job_path}/error.log", "a")
                 formatter = logging.Formatter('%(relativeCreated)d - %(name)s - %(levelname)s - %(message)s')
                 file_handler.setFormatter(formatter)
                 logger.addHandler(file_handler)
-
-
 
                 agent = Agent(*job_args.agent)
                 with Experiment(*job_args.experiment, agent) as experiment:

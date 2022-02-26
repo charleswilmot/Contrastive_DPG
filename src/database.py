@@ -8,6 +8,8 @@ import pickle
 from contextlib import contextmanager
 from collections import namedtuple
 from exploration import ExplorationConfig
+import re
+import os
 
 
 ACTION_DIM = 7
@@ -784,12 +786,12 @@ class Database:
             float(softmax_temperature_tN))
 
     @contextmanager
-    def get_a_job(self, path, hourly_pricing):
+    def get_a_job(self, hourly_pricing):
         command = f'SELECT * FROM experiment_configs WHERE repetitions_remaining > 0 LIMIT 0, 1'
         self.cursor.execute(command)
         res = self.cursor.fetchone() # tuple containing the data (one row)
         if res is None:
-            yield None, None, None
+            yield None, None
             return
         (
             experiment_config_id,
@@ -840,8 +842,18 @@ class Database:
                         experiment_config_id={experiment_config_id}
                       '''
         self.cursor.execute(command)
+
+        ids = [int(match.group(1)) for x in os.listdir("../experiments/") if (match := re.match('([0-9]+)_[a-zA-Z]+[0-9]+_[0-9]+-[0-9]+', x))]
+        if ids:
+            exp_id = 1 + max(ids)
+        else:
+            exp_id = 0
+
+        run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_eid_{experiment_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
+        job_path = f'../experiments/{run_name}'
+
         PRNGKey_start = self.get_PRNGKey_start(experiment_config_id)
-        experiment_id = self.insert_experiment(experiment_config_id, PRNGKey_start, datetime.now(), hourly_pricing, path)
+        experiment_id = self.insert_experiment(experiment_config_id, PRNGKey_start, datetime.now(), hourly_pricing, job_path)
         hierarchization_config = self.get_hierarchization_config(hierarchization_config_id)
         exploration_config = self.get_exploration_config(exploration_config_id)
         agent_args = (
@@ -871,7 +883,7 @@ class Database:
             experiment_id,
         )
         try:
-            yield experiment_config_id, experiment_id, Args(agent_args, experiment_args, mainloop_args)
+            yield job_path, Args(agent_args, experiment_args, mainloop_args)
         except:
             self._logger.critical(f"An exception has occured, deleting the experiment {experiment_id}")
             self.delete_experiment(experiment_id)
