@@ -851,7 +851,7 @@ class Database:
         else:
             exp_id = 0
 
-        run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
+        run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_{datetime.now():%b%d_%H-%M}'
         job_path = f'../experiments/{run_name}'
 
         PRNGKey_start = self.get_PRNGKey_start(experiment_config_id)
