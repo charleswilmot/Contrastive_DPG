@@ -505,6 +505,8 @@ class Database:
             for name, val in name_values_dict.items():
                 if val is None:
                     tmp.append(f"{name} IS NULL")
+                elif type(val) is float:
+                    tmp.append(f"{name}=CAST(%s AS DECIMAL(12,7))")
                 else:
                     tmp.append(f"{name}=%s")
 
@@ -849,7 +851,7 @@ class Database:
         else:
             exp_id = 0
 
-        run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_eid_{experiment_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
+        run_name = f'count_{exp_id:03d}_ecid_{experiment_config_id:03d}_{datetime.datetime.now():%b%d_%H-%M}'
         job_path = f'../experiments/{run_name}'
 
         PRNGKey_start = self.get_PRNGKey_start(experiment_config_id)
