@@ -880,7 +880,7 @@ class Database:
             exploration_config,
             repetitions_remaining == repetitions_total,
             restore_path,
-            path,
+            job_path,
             self,
             experiment_id,
         )
