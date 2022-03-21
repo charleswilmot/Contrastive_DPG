@@ -57,6 +57,8 @@ if __name__ == '__main__':
         fig = plt.figure()
         ax = fig.add_subplot(111)
 
+        done = False
+
         for index, info in variation_columns.iterrows():
             returns = db.get_dataframe(f'''
                 SELECT
@@ -78,6 +80,7 @@ if __name__ == '__main__':
                     episode_nb
             ''')
             if len(returns):
+                done = True
                 x = returns.episode_nb.values
                 y_train = returns["AVG(training_episode_return)"].values
                 label = " - ".join([f"{param_name}={val}" for param_name, val in info[2:].iteritems()])
@@ -100,12 +103,13 @@ if __name__ == '__main__':
                 row = info[2:].append(row)
                 scores = scores.append(row, ignore_index=True, sort=False)
 
-        ax.set_xlim([0, 16000])
-        ax.set_ylim([-0.1, 2.1])
-        ax.legend(prop={'size': 6})
-        fig.savefig(f"/tmp/{collection}.png", dpi=400)
-        plt.close(fig)
-        scores = scores.reindex(row.index, axis=1)
-        print("###", collection, '###')
-        print(scores)
-        print("\n\n")
+        if done:
+            ax.set_xlim([0, 16000])
+            ax.set_ylim([-0.1, 2.1])
+            ax.legend(prop={'size': 6})
+            fig.savefig(f"/tmp/{collection}.png", dpi=400)
+            plt.close(fig)
+            scores = scores.reindex(row.index, axis=1)
+            print("###", collection, '###')
+            print(scores)
+            print("\n\n")

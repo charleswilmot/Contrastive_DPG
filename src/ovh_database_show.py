@@ -47,6 +47,7 @@ if __name__ == '__main__':
         "experiment_configs": default_case("experiment_configs"),
         "hyperparameters_configs": default_case("hyperparameters_configs"),
         "exploration_configs": default_case("exploration_configs"),
+        "mainloop_configs": default_case("mainloop_configs"),
         "hierarchization_configs": hierarchization_configs,
     }
 
