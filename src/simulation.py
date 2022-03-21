@@ -201,6 +201,15 @@ class SimulationConsumer(SimulationConsumerAbstract):
         ]
 
     @communicate_return_value
+    def reset_pose(self, register_states, register_goals):
+        self._previous_hermite_speeds[:] = 0
+        self._previous_hermite_accelerations[:] = 0
+        for tree in self._reset_configuration_trees:
+            self._pyrep.set_configuration_tree(tree)
+        self.set_stateful_objects_states(register_states)
+        self.set_stateful_objects_goals(register_goals)
+
+    @communicate_return_value
     def reset(self, register_states, register_goals, actions):
         self._previous_hermite_speeds[:] = 0
         self._previous_hermite_accelerations[:] = 0
@@ -267,7 +276,10 @@ class SimulationConsumer(SimulationConsumerAbstract):
             self._state_std[3 * n:] = reg_std
         self._state_buffer[0 * n:1 * n] = self.get_joint_positions()
         self._state_buffer[1 * n:2 * n] = self.get_joint_velocities()
-        self._state_buffer[2 * n:3 * n] = self.get_joint_forces()
+        try:
+            self._state_buffer[2 * n:3 * n] = self.get_joint_forces()
+        except RuntimeError:
+            self._state_buffer[2 * n:3 * n] = 0
         self._state_buffer[3 * n:] = self.get_stateful_objects_states()
         # STATE NORMALIZATION:
         self._state_buffer -= self._state_mean
@@ -392,6 +404,33 @@ class SimulationConsumer(SimulationConsumerAbstract):
             arm.set_joint_target_velocities(velocities[last:next])
             last = next
 
+    def set_joint_positions(self, positions):
+        last = 0
+        next = 0
+        for arm, joint_count in zip(self._arm_list, self._arm_joints_count):
+            next += joint_count
+            arm.set_joint_positions(positions[last:next], disable_dynamics=True)
+            last = next
+
+    def set_joint_mode(self, mode):
+        for arm in self._arm_list:
+            arm.set_joint_mode(mode)
+
+    @communicate_return_value
+    def get_joint_mode(self):
+        ret = []
+        for arm in self._arm_list:
+            ret += arm.get_joint_mode(mode)
+        return ret
+
+    def set_joint_target_positions(self, positions):
+        last = 0
+        next = 0
+        for arm, joint_count in zip(self._arm_list, self._arm_joints_count):
+            next += joint_count
+            arm.set_joint_target_positions(positions[last:next])
+            last = next
+
     @communicate_return_value
     def apply_action(self, actions):
         velocities = actions * self._upper_velocity_limits
@@ -505,6 +544,18 @@ class SimulationConsumer(SimulationConsumerAbstract):
                 arm.get_joint_upper_velocity_limits()
             last = next
         return self._upper_velocity_limits
+
+    @communicate_return_value
+    def get_joint_intervals(self):
+        last = 0
+        next = 0
+        self._intervals = np.zeros((self._n_joints, 2), dtype=np.float32)
+        for arm, joint_count in zip(self._arm_list, self._arm_joints_count):
+            next += joint_count
+            _, self._intervals[last:next] = \
+                arm.get_joint_intervals()
+            last = next
+        return self._intervals
 
     @communicate_return_value
     def get_n_joints(self):
